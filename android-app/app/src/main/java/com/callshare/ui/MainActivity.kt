@@ -18,6 +18,7 @@ import androidx.core.content.ContextCompat
 import com.callshare.CallShareApp
 import com.callshare.R
 import com.callshare.native.NativeBridge
+import com.callshare.telecom.RoleManagerHelper
 import org.json.JSONArray
 
 class MainActivity : AppCompatActivity() {
@@ -141,18 +142,26 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    override fun onResume() {
+        super.onResume()
+        updateRoleButtonState()
+    }
+
+    private fun updateRoleButtonState() {
+        if (RoleManagerHelper.isDefaultDialer(this)) {
+            btnSetDefaultDialer.text = "✓ DEFAULT CALLER ACTIVE"
+            btnSetDefaultDialer.setBackgroundColor(ContextCompat.getColor(this, R.color.emerald_active))
+        } else {
+            btnSetDefaultDialer.text = "Set Default Caller / Companion"
+        }
+    }
+
     private fun requestInCallCompanionRole() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            val roleManager = getSystemService(Context.ROLE_SERVICE) as? RoleManager
-            if (roleManager != null && roleManager.isRoleAvailable(RoleManager.ROLE_DIALER)) {
-                val intent = roleManager.createRequestRoleIntent(RoleManager.ROLE_DIALER)
-                startActivity(intent)
-                return
-            }
+        val intent = RoleManagerHelper.createDefaultDialerIntent(this)
+        if (intent != null) {
+            startActivity(intent)
+        } else {
+            Toast.makeText(this, "CallShare is already the default dialer!", Toast.LENGTH_SHORT).show()
         }
-        val intent = Intent(TelecomManager.ACTION_CHANGE_DEFAULT_DIALER).apply {
-            putExtra(TelecomManager.EXTRA_CHANGE_DEFAULT_DIALER_PACKAGE_NAME, packageName)
-        }
-        startActivity(intent)
     }
 }
