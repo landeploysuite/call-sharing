@@ -16,6 +16,7 @@ import android.telecom.TelecomManager
 import android.util.Log
 import android.view.Gravity
 import android.widget.Button
+import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
@@ -27,6 +28,7 @@ import androidx.core.content.ContextCompat
 import com.callshare.CallShareApp
 import com.callshare.R
 import com.callshare.native.NativeBridge
+import com.callshare.net.NetworkUtils
 import com.callshare.telecom.CallShareConnectionService
 import com.callshare.telecom.RoleManagerHelper
 import org.json.JSONArray
@@ -38,7 +40,9 @@ class MainActivity : AppCompatActivity() {
     private lateinit var btnRefreshPeers: Button
     private lateinit var btnLaunchAod: Button
     private lateinit var btnSetDefaultDialer: Button
-    private lateinit var btnSimulateIncomingCall: Button
+    private lateinit var editDialTarget: EditText
+    private lateinit var btnDirectCall: Button
+    private lateinit var btnCallPeerSim: Button
     private lateinit var btnOpenSettings: Button
 
     private val permissionLauncher = registerForActivityResult(
@@ -244,7 +248,9 @@ class MainActivity : AppCompatActivity() {
         btnRefreshPeers = findViewById(R.id.btn_refresh_peers)
         btnLaunchAod = findViewById(R.id.btn_launch_aod)
         btnSetDefaultDialer = findViewById(R.id.btn_set_default_dialer)
-        btnSimulateIncomingCall = findViewById(R.id.btn_simulate_call)
+        editDialTarget = findViewById(R.id.edit_dial_target)
+        btnDirectCall = findViewById(R.id.btn_direct_call)
+        btnCallPeerSim = findViewById(R.id.btn_call_peer_sim)
         btnOpenSettings = findViewById(R.id.btn_open_settings)
 
         btnOpenSettings.setOnClickListener {
@@ -278,24 +284,60 @@ class MainActivity : AppCompatActivity() {
             requestInCallCompanionRole()
         }
 
-        btnSimulateIncomingCall.setOnClickListener {
+        btnDirectCall.setOnClickListener {
+            val target = editDialTarget.text.toString().trim()
+            if (target.isEmpty()) {
+                Toast.makeText(this, "Please enter a peer IP or phone number", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
             try {
-                val intent = Intent(this, AodActivity::class.java).apply {
-                    putExtra("EXTRA_SESSION_ID", "test-sim-call-101")
-                    putExtra("EXTRA_CALLER_NUMBER", "+1 (555) 019-2834")
-                    putExtra("EXTRA_CALLER_NAME", "Remote SIM Contact")
-                    putExtra("EXTRA_IS_RINGING", true)
+                val sessionId = "p2p-${System.currentTimeMillis()}"
+                if (target.contains(".") && !target.startsWith("+")) {
+                    NativeBridge.safeConnectToPeer(target, 45782, 45783)
+                }
+                NativeBridge.safeNotifyLocalCallRinging(sessionId, target, "Direct P2P Peer", -1)
+                val intent = Intent(this, CallActivity::class.java).apply {
+                    putExtra("EXTRA_SESSION_ID", sessionId)
+                    putExtra("EXTRA_CALLER_NAME", "Direct P2P Call")
+                    putExtra("EXTRA_CALLER_NUMBER", target)
                 }
                 startActivity(intent)
             } catch (t: Throwable) {
-                Toast.makeText(this, "Simulation launch error: ${t.message}", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, "Error starting P2P call: ${t.message}", Toast.LENGTH_SHORT).show()
+            }
+        }
+
+        btnCallPeerSim.setOnClickListener {
+            val target = editDialTarget.text.toString().trim()
+            if (target.isEmpty()) {
+                Toast.makeText(this, "Please enter a cellular phone number", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+            try {
+                val sessionId = "sim-relay-${System.currentTimeMillis()}"
+                NativeBridge.safeNotifyLocalCallRinging(sessionId, target, "Cellular Relay", 0)
+                val intent = Intent(this, CallActivity::class.java).apply {
+                    putExtra("EXTRA_SESSION_ID", sessionId)
+                    putExtra("EXTRA_CALLER_NAME", "Relayed SIM Call")
+                    putExtra("EXTRA_CALLER_NUMBER", target)
+                }
+                startActivity(intent)
+            } catch (t: Throwable) {
+                Toast.makeText(this, "Error starting SIM relay: ${t.message}", Toast.LENGTH_SHORT).show()
             }
         }
     }
 
     private fun refreshDashboard() {
-        val localIp = CallShareApp.instance.getLocalWifiIpAddress() ?: "Checking Wi-Fi..."
-        textLocalInfo.text = "Device IP: $localIp\nPorts: Discovery 45781 | Signaling 45782 | Media 45783"
+        val localIp = NetworkUtils.getLocalIpv4Address(this)
+        val activeSims = NetworkUtils.getActiveSimCards(this)
+        val simSummary = if (activeSims.isNotEmpty()) {
+            activeSims.joinToString(", ") { "${it.carrierName} [Slot ${it.slotIndex}]" }
+        } else {
+            "No active SIM"
+        }
+        val modelName = NetworkUtils.getDeviceModelName()
+        textLocalInfo.text = "Device: $modelName ($localIp)\nCarrier: $simSummary\nPorts: Discovery 45781 | Signaling 45782 | Media 45783"
 
         if (!NativeBridge.isLoaded) {
             textPeersList.text = "Native Engine: Initializing...\nTap 'Refresh Peer Mesh' once permissions are granted."
@@ -309,23 +351,33 @@ class MainActivity : AppCompatActivity() {
                 textPeersList.text = "● Searching for peer Android devices on local offline Wi-Fi..."
             } else {
                 val sb = StringBuilder()
+                val discoveredIps = mutableListOf<String>()
                 for (i in 0 until arr.length()) {
                     val peer = arr.getJSONObject(i)
                     val devName = peer.getString("device_name")
                     val ip = peer.getString("ip")
                     val carrier = peer.getString("carrier_name")
                     val battery = peer.getInt("battery_pct")
+                    discoveredIps.add(ip)
                     sb.append("• $devName ($ip)\n  Carrier: $carrier | Battery: $battery%\n\n")
 
                     if (i == 0) {
                         try {
-                            NativeBridge.connectToPeer(ip, 45782, 45783)
+                            NativeBridge.safeConnectToPeer(ip, 45782, 45783)
                         } catch (e: Throwable) {
                             Log.w("MainActivity", "Peer connection warning: ${e.message}")
                         }
                     }
                 }
                 textPeersList.text = sb.toString()
+
+                // Allow tapping peer list to auto-fill dialer input with discovered peer IP
+                textPeersList.setOnClickListener {
+                    if (discoveredIps.isNotEmpty()) {
+                        editDialTarget.setText(discoveredIps[0])
+                        Toast.makeText(this, "Dial target set to ${discoveredIps[0]}", Toast.LENGTH_SHORT).show()
+                    }
+                }
             }
         } catch (e: Throwable) {
             textPeersList.text = "Searching for peer devices..."

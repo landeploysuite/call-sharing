@@ -6,6 +6,9 @@
     <string name="launch_aod">Launch Always-On Display (AOD)</string>
     <string name="set_companion_role">Grant InCall Companion Role</string>
     <string name="simulate_incoming_call">Simulate Relayed Call</string>
+    <string name="direct_p2p_call">Direct P2P Call</string>
+    <string name="call_via_peer_sim">Call via Peer SIM</string>
+    <string name="dial_hint">Enter phone number or peer IP</string>
     <string name="answer_call">Answer</string>
     <string name="reject_call">Decline</string>
 </resources>

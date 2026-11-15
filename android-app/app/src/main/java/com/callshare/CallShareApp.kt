@@ -8,6 +8,7 @@ import android.os.Build
 import android.telephony.TelephonyManager
 import android.util.Log
 import com.callshare.native.NativeBridge
+import com.callshare.net.NetworkUtils
 import com.callshare.ui.CrashActivity
 import java.net.Inet4Address
 import java.net.NetworkInterface
@@ -138,25 +139,20 @@ class CallShareApp : Application() {
                 sharedPrefs.edit().putString("device_id", deviceId).apply()
             }
 
-            val deviceName = "${Build.MANUFACTURER.replaceFirstChar { it.uppercase() }} ${Build.MODEL}"
-            val localIp = getLocalWifiIpAddress() ?: "127.0.0.1"
+            val deviceName = NetworkUtils.getDeviceModelName()
+            val localIp = NetworkUtils.getLocalIpv4Address(this)
 
-            // Determine SIM carrier name & slot safely without crashing on missing permissions
+            // Determine real SIM carrier name & slot safely using NetworkUtils
             var carrierName = "Cellular SIM"
             var simSlot = 0
-            try {
-                val telephonyManager = getSystemService(Context.TELEPHONY_SERVICE) as? TelephonyManager
-                if (telephonyManager != null) {
-                    val opName = telephonyManager.networkOperatorName
-                    if (!opName.isNullOrBlank()) {
-                        carrierName = opName
-                    }
-                }
-            } catch (e: Throwable) {
-                Log.w(TAG, "Carrier info read deferred until permission granted: ${e.message}")
+            val activeSims = NetworkUtils.getActiveSimCards(this)
+            if (activeSims.isNotEmpty()) {
+                val primarySim = activeSims[0]
+                carrierName = primarySim.carrierName
+                simSlot = primarySim.slotIndex
             }
 
-            Log.i(TAG, "Initializing Native Core: ID=$deviceId, Name=$deviceName, IP=$localIp, Carrier=$carrierName")
+            Log.i(TAG, "Initializing Native Core: ID=$deviceId, Name=$deviceName, IP=$localIp, Carrier=$carrierName (SIM slot $simSlot)")
             val success = NativeBridge.safeInitNativeCore(deviceId, deviceName, localIp, carrierName, simSlot)
             if (success) {
                 NativeBridge.safeStartDiscovery()
@@ -170,23 +166,7 @@ class CallShareApp : Application() {
     }
 
     fun getLocalWifiIpAddress(): String? {
-        try {
-            val interfaces = NetworkInterface.getNetworkInterfaces() ?: return null
-            while (interfaces.hasMoreElements()) {
-                val iface = interfaces.nextElement()
-                if (iface.isLoopback || !iface.isUp) continue
-                val addresses = iface.inetAddresses
-                while (addresses.hasMoreElements()) {
-                    val addr = addresses.nextElement()
-                    if (addr is Inet4Address && !addr.isLoopbackAddress) {
-                        return addr.hostAddress
-                    }
-                }
-            }
-        } catch (e: Throwable) {
-            Log.w(TAG, "Error obtaining local IP: ${e.message}")
-        }
-        return null
+        return NetworkUtils.getLocalIpv4Address(this)
     }
 
     override fun onTerminate() {

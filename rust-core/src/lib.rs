@@ -68,6 +68,7 @@ fn dispatch_java_remote_call_ringing(session_id: &str, caller_number: &str, call
     };
     if let Ok(mut env) = vm.attach_current_thread() {
         if env.exception_check().unwrap_or(false) {
+            let _ = env.exception_describe();
             let _ = env.exception_clear();
         }
 
@@ -97,6 +98,7 @@ fn dispatch_java_remote_call_ringing(session_id: &str, caller_number: &str, call
         );
 
         if env.exception_check().unwrap_or(false) {
+            let _ = env.exception_describe();
             let _ = env.exception_clear();
         }
     }
@@ -113,6 +115,7 @@ fn dispatch_java_call_connected(session_id: &str) {
     };
     if let Ok(mut env) = vm.attach_current_thread() {
         if env.exception_check().unwrap_or(false) {
+            let _ = env.exception_describe();
             let _ = env.exception_clear();
         }
 
@@ -130,6 +133,7 @@ fn dispatch_java_call_connected(session_id: &str) {
         );
 
         if env.exception_check().unwrap_or(false) {
+            let _ = env.exception_describe();
             let _ = env.exception_clear();
         }
     }
@@ -146,6 +150,7 @@ fn dispatch_java_call_terminated(session_id: &str, reason: &str) {
     };
     if let Ok(mut env) = vm.attach_current_thread() {
         if env.exception_check().unwrap_or(false) {
+            let _ = env.exception_describe();
             let _ = env.exception_clear();
         }
 
@@ -166,6 +171,7 @@ fn dispatch_java_call_terminated(session_id: &str, reason: &str) {
         );
 
         if env.exception_check().unwrap_or(false) {
+            let _ = env.exception_describe();
             let _ = env.exception_clear();
         }
     }
@@ -182,6 +188,7 @@ fn dispatch_java_call_revoked(session_id: &str, reason: &str) {
     };
     if let Ok(mut env) = vm.attach_current_thread() {
         if env.exception_check().unwrap_or(false) {
+            let _ = env.exception_describe();
             let _ = env.exception_clear();
         }
 
@@ -202,6 +209,7 @@ fn dispatch_java_call_revoked(session_id: &str, reason: &str) {
         );
 
         if env.exception_check().unwrap_or(false) {
+            let _ = env.exception_describe();
             let _ = env.exception_clear();
         }
     }
@@ -239,6 +247,12 @@ pub extern "system" fn Java_com_callshare_native_NativeBridge_initNativeCore(
             } else {
                 error!("Failed to create GlobalRef for NativeBridge JClass");
             }
+        }
+
+        // 3. Guard against duplicate initialization: return success immediately if already initialized
+        if GLOBAL_CORE.get().is_some() {
+            info!("CallShare Core already initialized; returning success without re-creating runtime");
+            return 1;
         }
 
         #[cfg(target_os = "android")]

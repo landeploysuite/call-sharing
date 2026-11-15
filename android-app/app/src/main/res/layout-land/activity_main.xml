@@ -123,14 +123,50 @@
                 android:text="@string/set_companion_role"
                 android:textColor="@color/white" />
 
-            <Button
-                android:id="@+id/btn_simulate_call"
+            <EditText
+                android:id="@+id/edit_dial_target"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="10dp"
-                android:backgroundTint="@color/dark_card"
-                android:text="@string/simulate_incoming_call"
-                android:textColor="@color/aod_mesh_green" />
+                android:background="@color/dark_card"
+                android:hint="@string/dial_hint"
+                android:inputType="phone"
+                android:minHeight="44dp"
+                android:padding="10dp"
+                android:textColor="@color/aod_clock_white"
+                android:textColorHint="@color/text_telemetry_muted"
+                android:textSize="13sp" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:orientation="horizontal">
+
+                <Button
+                    android:id="@+id/btn_direct_call"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:layout_marginEnd="4dp"
+                    android:backgroundTint="@color/aod_mesh_green"
+                    android:text="@string/direct_p2p_call"
+                    android:textColor="@color/black"
+                    android:textSize="12sp"
+                    android:textStyle="bold" />
+
+                <Button
+                    android:id="@+id/btn_call_peer_sim"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:layout_marginStart="4dp"
+                    android:backgroundTint="@color/aod_accent_cyan"
+                    android:text="@string/call_via_peer_sim"
+                    android:textColor="@color/black"
+                    android:textSize="12sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
 
             <Button
                 android:id="@+id/btn_open_settings"

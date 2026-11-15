@@ -32,6 +32,9 @@ class AodActivity : AppCompatActivity(), SensorEventListener {
 
     private lateinit var sensorManager: SensorManager
     private var proximitySensor: Sensor? = null
+    private var lightSensor: Sensor? = null
+    private var lastProximityNear: Boolean = false
+    private var lastLux: Float = 50f
 
     private lateinit var aodContainer: View
     private lateinit var draggableCanvas: DraggableAodCanvasView
@@ -185,8 +188,13 @@ class AodActivity : AppCompatActivity(), SensorEventListener {
     }
 
     private fun setupSensors() {
-        sensorManager = getSystemService(Context.SENSOR_SERVICE) as SensorManager
-        proximitySensor = sensorManager.getDefaultSensor(Sensor.TYPE_PROXIMITY)
+        try {
+            sensorManager = getSystemService(Context.SENSOR_SERVICE) as SensorManager
+            proximitySensor = sensorManager.getDefaultSensor(Sensor.TYPE_PROXIMITY)
+            lightSensor = sensorManager.getDefaultSensor(Sensor.TYPE_LIGHT)
+        } catch (t: Throwable) {
+            android.util.Log.w("AodActivity", "Error accessing hardware sensors: ${t.message}")
+        }
     }
 
     override fun onResume() {
@@ -194,6 +202,9 @@ class AodActivity : AppCompatActivity(), SensorEventListener {
         val prefs = getSharedPreferences("callshare_settings_prefs", Context.MODE_PRIVATE)
         if (prefs.getBoolean("pref_proximity_gate", true)) {
             proximitySensor?.let {
+                sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_NORMAL)
+            }
+            lightSensor?.let {
                 sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_NORMAL)
             }
         }
@@ -207,7 +218,11 @@ class AodActivity : AppCompatActivity(), SensorEventListener {
 
     override fun onPause() {
         super.onPause()
-        sensorManager.unregisterListener(this)
+        try {
+            sensorManager.unregisterListener(this)
+        } catch (t: Throwable) {
+            android.util.Log.w("AodActivity", "Error unregistering sensors: ${t.message}")
+        }
     }
 
     override fun onConfigurationChanged(newConfig: Configuration) {
@@ -217,31 +232,43 @@ class AodActivity : AppCompatActivity(), SensorEventListener {
 
     private fun updateOrientationState(orientation: Int) {
         val nativeOrientation = if (orientation == Configuration.ORIENTATION_LANDSCAPE) 1 else 0
-        NativeBridge.setDeviceOrientation(nativeOrientation)
+        NativeBridge.safeSetDeviceOrientation(nativeOrientation)
     }
 
     // -------------------------------------------------------------------------
-    // SENSOR GATING (Face-down / Pocket Power Preservation)
+    // HARDWARE SENSOR GATING (Proximity & Light Sensor Face-down / Pocket Power Preservation)
     // -------------------------------------------------------------------------
     override fun onSensorChanged(event: SensorEvent?) {
-        if (event?.sensor?.type == Sensor.TYPE_PROXIMITY) {
+        event ?: return
+        if (event.sensor.type == Sensor.TYPE_PROXIMITY) {
             val distance = event.values[0]
             val maxRange = proximitySensor?.maximumRange ?: 5f
-            val isNear = distance < maxRange && distance < 4f
+            lastProximityNear = (distance < maxRange && distance < 4f)
+            applySensorGating()
+        } else if (event.sensor.type == Sensor.TYPE_LIGHT) {
+            lastLux = event.values[0]
+            applySensorGating()
+        }
+    }
 
-            NativeBridge.onSensorStateChanged(isNear)
+    private fun applySensorGating() {
+        // Device is covered, face down, or in a pocket when proximity is near or light is pitch dark with near proximity
+        val isCovered = lastProximityNear || (lastLux <= 1f && lastProximityNear)
 
-            if (isNear) {
-                aodContainer.visibility = View.GONE
-                val lp = window.attributes
-                lp.screenBrightness = 0.0f
-                window.attributes = lp
-            } else {
-                aodContainer.visibility = View.VISIBLE
-                val lp = window.attributes
-                lp.screenBrightness = if (isCallRinging) 0.8f else 0.01f
-                window.attributes = lp
-            }
+        NativeBridge.safeOnSensorStateChanged(isCovered)
+
+        if (isCovered) {
+            aodContainer.visibility = View.GONE
+            val lp = window.attributes
+            lp.screenBrightness = 0.0f
+            window.attributes = lp
+        } else {
+            aodContainer.visibility = View.VISIBLE
+            val prefs = getSharedPreferences("callshare_settings_prefs", Context.MODE_PRIVATE)
+            val dimmingProgress = prefs.getInt("pref_screen_dimming", 1)
+            val lp = window.attributes
+            lp.screenBrightness = if (isCallRinging) 0.8f else (dimmingProgress / 100f).coerceIn(0.01f, 0.20f)
+            window.attributes = lp
         }
     }
 
@@ -315,7 +342,7 @@ class AodActivity : AppCompatActivity(), SensorEventListener {
         if (CallShareInCallService.currentCall != null) {
             CallShareInCallService.answerCurrentCall()
         } else {
-            NativeBridge.answerRelayedCall(sId)
+            NativeBridge.safeAnswerRelayedCall(sId)
         }
 
         hideIncomingCallAlert()
@@ -334,7 +361,7 @@ class AodActivity : AppCompatActivity(), SensorEventListener {
         if (CallShareInCallService.currentCall != null) {
             CallShareInCallService.rejectCurrentCall()
         } else {
-            NativeBridge.rejectRelayedCall(sId, "user-declined")
+            NativeBridge.safeRejectRelayedCall(sId, "user-declined")
         }
         hideIncomingCallAlert()
     }

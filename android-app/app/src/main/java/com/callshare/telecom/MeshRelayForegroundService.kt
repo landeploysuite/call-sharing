@@ -86,18 +86,46 @@ class MeshRelayForegroundService : Service() {
 
         val notification = buildRelayNotification(callerName, callerNumber, sessionId)
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            val fgType = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                ServiceInfo.FOREGROUND_SERVICE_TYPE_PHONE_CALL or
-                ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE or
-                ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                var fgType = 0
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                    // Android 14+ (API 34) dynamic permission checks
+                    val hasRecordAudio = androidx.core.content.ContextCompat.checkSelfPermission(
+                        this, android.Manifest.permission.RECORD_AUDIO
+                    ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+                    val hasManageCalls = androidx.core.content.ContextCompat.checkSelfPermission(
+                        this, android.Manifest.permission.MANAGE_OWN_CALLS
+                    ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+
+                    if (hasManageCalls) fgType = fgType or ServiceInfo.FOREGROUND_SERVICE_TYPE_PHONE_CALL
+                    if (hasRecordAudio) fgType = fgType or ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
+                    fgType = fgType or ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE
+                } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                    // Android 11–13 (API 30–33)
+                    fgType = ServiceInfo.FOREGROUND_SERVICE_TYPE_PHONE_CALL or ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE
+                    val hasRecordAudio = androidx.core.content.ContextCompat.checkSelfPermission(
+                        this, android.Manifest.permission.RECORD_AUDIO
+                    ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+                    if (hasRecordAudio) {
+                        fgType = fgType or ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
+                    }
+                } else {
+                    // Android 10 (API 29)
+                    fgType = ServiceInfo.FOREGROUND_SERVICE_TYPE_PHONE_CALL
+                }
+
+                if (fgType != 0) {
+                    startForeground(NOTIFICATION_ID, notification, fgType)
+                } else {
+                    startForeground(NOTIFICATION_ID, notification)
+                }
             } else {
-                ServiceInfo.FOREGROUND_SERVICE_TYPE_PHONE_CALL or
-                ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE
+                // Android 8.0–9.0 (API 26–28): 2-arg version ONLY!
+                startForeground(NOTIFICATION_ID, notification)
             }
-            startForeground(NOTIFICATION_ID, notification, fgType)
-        } else {
-            startForeground(NOTIFICATION_ID, notification)
+        } catch (e: Throwable) {
+            Log.e(TAG, "Failed to start foreground service: ${e.message}", e)
         }
 
         return START_STICKY
