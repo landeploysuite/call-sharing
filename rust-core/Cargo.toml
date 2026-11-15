@@ -1,0 +1,42 @@
+[package]
+name = "callshare-core"
+version = "0.1.0"
+edition = "2021"
+authors = ["CallShare Systems Team"]
+description = "High-performance, offline P2P call bridging and universal AOD core engine for Android"
+
+[lib]
+name = "callshare_core"
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+# Concurrency & Async I/O
+tokio = { version = "1.38", features = ["full"] }
+parking_lot = "0.12"
+bytes = "1.6"
+
+# Low-level Networking
+socket2 = { version = "0.5", features = ["all"] }
+
+# Serialization & Protocol Framing
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Security & Authenticated Encryption (Offline token handshake)
+chacha20poly1305 = { version = "0.10", features = ["alloc"] }
+rand = "0.8"
+
+# Android NDK / JNI Interop & Logging
+jni = { version = "0.21", default-features = false }
+log = "0.4"
+android_logger = "0.14"
+
+# Error Handling
+thiserror = "1.0"
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true

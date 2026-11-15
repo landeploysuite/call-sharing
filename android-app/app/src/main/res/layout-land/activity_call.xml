@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/dark_surface"
+    android:gravity="center"
+    android:orientation="horizontal"
+    android:padding="32dp"
+    android:baselineAligned="false">
+
+    <!-- Left Pane: Caller Info & Timer -->
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:gravity="center"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/text_call_name"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Abhay SIM"
+            android:textColor="@color/white"
+            android:textSize="26sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/text_call_number"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:text="+1 (555) 019-2834"
+            android:textColor="@color/aod_muted_gray"
+            android:textSize="15sp" />
+
+        <TextView
+            android:id="@+id/text_call_duration"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="00:00"
+            android:textColor="@color/aod_accent_cyan"
+            android:textSize="22sp" />
+
+        <TextView
+            android:id="@+id/text_call_quality"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:text="● P2P Latency: &lt;35ms | Opus 16kHz"
+            android:textColor="@color/aod_mesh_green"
+            android:textSize="12sp" />
+    </LinearLayout>
+
+    <!-- Right Pane: In-Call Controls -->
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:gravity="center"
+        android:orientation="horizontal">
+
+        <ImageButton
+            android:id="@+id/btn_call_mute"
+            android:layout_width="56dp"
+            android:layout_height="56dp"
+            android:layout_marginEnd="16dp"
+            android:background="@drawable/ic_mic"
+            android:backgroundTint="@color/dark_card"
+            android:contentDescription="Mute Microphone"
+            android:padding="14dp" />
+
+        <ImageButton
+            android:id="@+id/btn_call_speaker"
+            android:layout_width="56dp"
+            android:layout_height="56dp"
+            android:layout_marginEnd="16dp"
+            android:background="@drawable/ic_volume_up"
+            android:backgroundTint="@color/dark_card"
+            android:contentDescription="Speakerphone"
+            android:padding="14dp" />
+
+        <ImageButton
+            android:id="@+id/btn_call_hangup"
+            android:layout_width="64dp"
+            android:layout_height="64dp"
+            android:background="@drawable/ic_call_end"
+            android:backgroundTint="@color/call_reject_red"
+            android:contentDescription="End Call"
+            android:padding="16dp" />
+    </LinearLayout>
+
+</LinearLayout>

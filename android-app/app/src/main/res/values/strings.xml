@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">CallShare P2P</string>
+    <string name="dashboard_title">CallShare P2P Relay</string>
+    <string name="mesh_status_searching">Searching for peer Android devices on local offline Wi-Fi...</string>
+    <string name="launch_aod">Launch Always-On Display (AOD)</string>
+    <string name="set_companion_role">Grant InCall Companion Role</string>
+    <string name="simulate_incoming_call">Simulate Relayed Call</string>
+    <string name="answer_call">Answer</string>
+    <string name="reject_call">Decline</string>
+</resources>
