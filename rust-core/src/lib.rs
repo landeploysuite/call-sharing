@@ -60,9 +60,9 @@ fn dispatch_java_remote_call_ringing(session_id: &str, caller_number: &str, call
     };
     if let Ok(mut env) = vm.attach_current_thread() {
         if let Ok(class) = env.find_class("com/callshare/native/NativeBridge") {
-            let s_id = env.new_string(session_id).unwrap_or_else(|_| match env.new_string("") { Ok(s) => s, Err(_) => return });
-            let c_num = env.new_string(caller_number).unwrap_or_else(|_| match env.new_string("") { Ok(s) => s, Err(_) => return });
-            let c_name = env.new_string(caller_name).unwrap_or_else(|_| match env.new_string("") { Ok(s) => s, Err(_) => return });
+            let Ok(s_id) = env.new_string(session_id) else { return; };
+            let Ok(c_num) = env.new_string(caller_number) else { return; };
+            let Ok(c_name) = env.new_string(caller_name) else { return; };
 
             let args = [
                 JValue::Object(&s_id.into()),
