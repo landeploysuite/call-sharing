@@ -7,7 +7,7 @@ pub mod aod;
 pub mod state;
 
 use std::net::SocketAddr;
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 use jni::JNIEnv;
 use jni::objects::{JClass, JString, JByteArray};
 use jni::sys::{jboolean, jint, jstring, jshortArray, jintArray};
@@ -31,13 +31,11 @@ struct AppCore {
     sensor_governor: Mutex<SensorGovernor>,
 }
 
-static mut GLOBAL_CORE: Option<AppCore> = None;
+static GLOBAL_CORE: OnceLock<AppCore> = OnceLock::new();
 static CORE_INIT_LOCK: Mutex<()> = Mutex::new(());
 
 fn get_core() -> &'static AppCore {
-    unsafe {
-        GLOBAL_CORE.as_ref().expect("CallShare Core engine is not initialized!")
-    }
+    GLOBAL_CORE.get().expect("CallShare Core engine is not initialized!")
 }
 
 // -----------------------------------------------------------------------------
@@ -136,18 +134,16 @@ pub extern "system" fn Java_com_callshare_native_NativeBridge_initNativeCore(
         }
     });
 
-    unsafe {
-        GLOBAL_CORE = Some(AppCore {
-            tokio_rt: rt,
-            audio_pipeline,
-            discovery,
-            signaling,
-            udp_streamer,
-            call_coordinator,
-            burn_in_engine,
-            sensor_governor,
-        });
-    }
+    let _ = GLOBAL_CORE.set(AppCore {
+        tokio_rt: rt,
+        audio_pipeline,
+        discovery,
+        signaling,
+        udp_streamer,
+        call_coordinator,
+        burn_in_engine,
+        sensor_governor,
+    });
 
     info!("CallShare Core native engine initialized successfully for: {}", dev_name);
     1
