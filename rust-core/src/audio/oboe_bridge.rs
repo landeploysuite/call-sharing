@@ -4,7 +4,7 @@
 use std::sync::Arc;
 use parking_lot::Mutex;
 use crate::audio::jitter_buffer::{AdaptiveJitterBuffer, PlaybackFrame};
-use crate::audio::opus_codec::{AudioCodecEngine, SAMPLES_PER_FRAME, PCM_FRAME_SIZE_BYTES};
+use crate::audio::opus_codec::{AudioCodecEngine, SAMPLES_PER_FRAME};
 
 pub struct AudioPipeline {
     codec: Mutex<AudioCodecEngine>,

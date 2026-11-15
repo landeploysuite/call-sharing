@@ -5,7 +5,7 @@ on:
     branches: [ main, master ]
   pull_request:
     branches: [ main, master ]
-  workflow_dispatch: # Allows one-click build from GitHub browser UI
+  workflow_dispatch:
 
 jobs:
   build:
@@ -27,10 +27,11 @@ jobs:
         with:
           packages: 'build-tools;34.0.0 ndk;25.2.9519653'
 
-      - name: Set up Rust & Android Targets
+      - name: Set up Rust
         uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: aarch64-linux-android, armv7-linux-androideabi, x86_64-linux-android
+
+      - name: Add Android Rust Targets
+        run: rustup target add aarch64-linux-android armv7-linux-androideabi x86_64-linux-android
 
       - name: Install cargo-ndk
         run: cargo install cargo-ndk
@@ -41,11 +42,15 @@ jobs:
           export ANDROID_NDK_HOME=$ANDROID_HOME/ndk/25.2.9519653
           cargo ndk -t arm64-v8a -t armeabi-v7a -t x86_64 -o ../android-app/app/src/main/jniLibs build --release
 
+      - name: Download Gradle Wrapper JAR
+        run: |
+          mkdir -p android-app/gradle/wrapper
+          curl -sLo android-app/gradle/wrapper/gradle-wrapper.jar https://raw.githubusercontent.com/gradle/gradle/v8.4.0/gradle/wrapper/gradle-wrapper.jar
+
       - name: Build APK with Gradle
         run: |
           cd android-app
-          chmod +x gradlew || true
-          gradle wrapper
+          chmod +x gradlew
           ./gradlew assembleDebug --stacktrace
 
       - name: Upload Compiled APK Artifact

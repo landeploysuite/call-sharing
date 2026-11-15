@@ -86,7 +86,8 @@ impl SignalingEngine {
         let engine_clone = engine.clone();
         tokio::spawn(async move {
             while let Some(msg) = outbound_rx.recv().await {
-                if let Some(peer) = *engine_clone.active_peer_addr.lock() {
+                let peer_target = *engine_clone.active_peer_addr.lock();
+                if let Some(peer) = peer_target {
                     let _ = Self::send_message_direct(peer, &msg).await;
                 }
             }
@@ -164,7 +165,7 @@ impl SignalingEngine {
         *self.active_peer_addr.lock() = Some(peer_addr);
 
         let mut len_buf = [0u8; 4];
-        while let Ok(()) = stream.read_exact(&mut len_buf).await {
+        while stream.read_exact(&mut len_buf).await.is_ok() {
             let msg_len = u32::from_be_bytes(len_buf) as usize;
             if msg_len > 65536 {
                 // Safeguard against invalid memory allocations

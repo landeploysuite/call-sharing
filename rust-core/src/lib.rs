@@ -9,16 +9,16 @@ pub mod state;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use jni::JNIEnv;
-use jni::objects::{JClass, JString, JByteArray, JShortArray, JIntArray};
-use jni::sys::{jboolean, jint, jlong, jstring, jbyteArray, jshortArray, jintArray};
+use jni::objects::{JClass, JString, JByteArray};
+use jni::sys::{jboolean, jint, jstring, jshortArray, jintArray};
 use parking_lot::Mutex;
 use tokio::runtime::Runtime;
-use log::{info, warn, error};
+use log::{info, error};
 
 use crate::audio::AudioPipeline;
 use crate::net::{DiscoveryEngine, PeerBeacon, SignalingEngine, SignalingMessage, UdpAudioStreamer, DEFAULT_SIGNALING_PORT, DEFAULT_MEDIA_PORT};
 use crate::aod::{BurnInShiftEngine, SensorGovernor, DisplayOrientation};
-use crate::state::{CallSessionCoordinator, CallState};
+use crate::state::CallSessionCoordinator;
 
 struct AppCore {
     tokio_rt: Runtime,
