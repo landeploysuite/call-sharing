@@ -1,7 +1,7 @@
 //! Audio Framing & Speech Codec Pipeline
-//! Handles Voice Activity Detection (VAD), PCM encapsulation, and Opus speech profiles.
+//! Handles Voice Activity Detection (VAD), Hangover Windowing, and PCM encapsulation.
 
-use std::sync::atomic::{AtomicU16, AtomicU32, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU16, AtomicU32, AtomicU8, Ordering};
 
 pub const SAMPLE_RATE_HZ: u32 = 16_000;
 pub const CHANNELS: u16 = 1; // Mono voice for telephony
@@ -13,11 +13,13 @@ pub const PCM_FRAME_SIZE_BYTES: usize = SAMPLES_PER_FRAME * BYTES_PER_SAMPLE; //
 const PACKET_MAGIC: u16 = 0xCA55;
 const FLAG_VAD_VOICE: u8 = 0x01;
 const SILENCE_RMS_THRESHOLD: f32 = 120.0; // Voice activity gate
+const VAD_HANGOVER_FRAMES: u8 = 6; // 6 frames * 20ms = 120ms hangover window
 
 pub struct AudioCodecEngine {
     seq_counter: AtomicU16,
     timestamp_counter: AtomicU32,
-    mic_muted: bool,
+    mic_muted: AtomicBool,
+    hangover_counter: AtomicU8,
 }
 
 impl AudioCodecEngine {
@@ -25,16 +27,43 @@ impl AudioCodecEngine {
         Self {
             seq_counter: AtomicU16::new(0),
             timestamp_counter: AtomicU32::new(0),
-            mic_muted: false,
+            mic_muted: AtomicBool::new(false),
+            hangover_counter: AtomicU8::new(0),
         }
     }
 
-    pub fn set_mic_muted(&mut self, muted: bool) {
-        self.mic_muted = muted;
+    pub fn set_mic_muted(&self, muted: bool) {
+        self.mic_muted.store(muted, Ordering::Relaxed);
+        if muted {
+            self.hangover_counter.store(0, Ordering::Relaxed);
+        }
     }
 
     pub fn is_mic_muted(&self) -> bool {
-        self.mic_muted
+        self.mic_muted.load(Ordering::Relaxed)
+    }
+
+    /// Bug 1.5: 120ms Hangover Window state machine prevents consonant onset clipping
+    pub fn is_voice_active(&self, rms: f32) -> bool {
+        if self.is_mic_muted() {
+            self.hangover_counter.store(0, Ordering::Relaxed);
+            return false;
+        }
+
+        if rms > SILENCE_RMS_THRESHOLD {
+            // Immediate speech onset: recharge hangover window
+            self.hangover_counter.store(VAD_HANGOVER_FRAMES, Ordering::Relaxed);
+            true
+        } else {
+            // Check hangover tail to preserve low-energy plosives/fricatives (/s/, /t/, /p/)
+            let current = self.hangover_counter.load(Ordering::Relaxed);
+            if current > 0 {
+                self.hangover_counter.store(current - 1, Ordering::Relaxed);
+                true
+            } else {
+                false
+            }
+        }
     }
 
     /// Calculate RMS audio energy to identify speech presence
@@ -52,7 +81,6 @@ impl AudioCodecEngine {
             return None;
         }
 
-        // Convert slice to i16 samples
         let mut samples = Vec::with_capacity(SAMPLES_PER_FRAME);
         for chunk in pcm_bytes.chunks_exact(2) {
             let sample = i16::from_le_bytes([chunk[0], chunk[1]]);
@@ -62,13 +90,13 @@ impl AudioCodecEngine {
             }
         }
 
-        if self.mic_muted {
-            // Send silence frame or skip
+        let is_muted = self.is_mic_muted();
+        if is_muted {
             samples.fill(0);
         }
 
         let rms = Self::compute_rms(&samples);
-        let is_voice = rms > SILENCE_RMS_THRESHOLD && !self.mic_muted;
+        let is_voice = self.is_voice_active(rms);
 
         let seq = self.seq_counter.fetch_add(1, Ordering::Relaxed);
         let timestamp = self.timestamp_counter.fetch_add(SAMPLES_PER_FRAME as u32, Ordering::Relaxed);
@@ -78,19 +106,12 @@ impl AudioCodecEngine {
             flags |= FLAG_VAD_VOICE;
         }
 
-        // Voice frame layout:
-        // [0..2]: Magic (0xCA55)
-        // [2..4]: Sequence number (u16 BE)
-        // [4..8]: Timestamp (u32 BE)
-        // [8]: Flags
-        // [9..]: Audio payload (in production Opus compressed; PCM fallback)
         let mut packet = Vec::with_capacity(9 + pcm_bytes.len());
         packet.extend_from_slice(&PACKET_MAGIC.to_be_bytes());
         packet.extend_from_slice(&seq.to_be_bytes());
         packet.extend_from_slice(&timestamp.to_be_bytes());
         packet.push(flags);
 
-        // Append PCM audio payload (16-bit LE)
         for sample in samples {
             packet.extend_from_slice(&sample.to_le_bytes());
         }

@@ -1,5 +1,6 @@
 //! Dynamic, Low-Latency Adaptive Jitter Buffer & Packet Loss Concealment (PLC)
 //! Designed specifically for volatile Wi-Fi environments.
+//! Implements RFC 1982 serial number arithmetic and anti-bloat latency pruning.
 
 use std::collections::VecDeque;
 use std::time::{Duration, Instant};
@@ -72,14 +73,13 @@ impl AdaptiveJitterBuffer {
             self.estimated_jitter_ms += (diff - self.estimated_jitter_ms) / 16.0;
             self.stats.estimated_jitter_ms = self.estimated_jitter_ms;
             
-            // Adapt target buffer depth based on 2 * estimated jitter
+            // Adapt target buffer depth based on 2.5 * estimated jitter
             let dynamic_target = (self.estimated_jitter_ms * 2.5).clamp(self.min_delay_ms, self.max_delay_ms);
-            // Smoothly converge target delay
             self.target_delay_ms += (dynamic_target - self.target_delay_ms) * 0.05;
         }
         self.last_transit_time_ms = Some(transit_ms);
 
-        // Check if packet is already too late
+        // Check if packet is already too late using RFC 1982 wrap arithmetic
         if let Some(last_seq) = self.last_played_seq {
             let diff = seq.wrapping_sub(last_seq) as i16;
             if diff <= 0 {
@@ -113,10 +113,24 @@ impl AdaptiveJitterBuffer {
             }
             Err(insert_idx) => {
                 if self.buffer.len() >= self.capacity {
-                    // Buffer overflow: evict oldest packet
                     self.buffer.pop_front();
                 }
                 self.buffer.insert(insert_idx, packet);
+            }
+        }
+
+        // Bug 3.1: Prune latency bloat immediately if network flushed a packet burst
+        self.prune_excess_latency();
+    }
+
+    /// Bug 3.1: Anti-bloat latency recovery after Wi-Fi stall flushes packet bursts
+    pub fn prune_excess_latency(&mut self) {
+        let max_acceptable_frames = ((self.target_delay_ms / 20.0) * 2.5).ceil() as usize;
+        while self.buffer.len() > max_acceptable_frames.max(3) {
+            let dropped = self.buffer.pop_front();
+            if let Some(pkt) = dropped {
+                self.last_played_seq = Some(pkt.seq);
+                self.stats.late_packets += 1;
             }
         }
     }
@@ -124,7 +138,7 @@ impl AdaptiveJitterBuffer {
     /// Retrieve the next playable payload or perform PLC if frame is lost
     pub fn get_frame(&mut self, expected_samples: usize) -> PlaybackFrame {
         let current_buffered_frames = self.buffer.len() as f32;
-        self.stats.current_depth_ms = current_buffered_frames * 20.0; // 20ms per frame
+        self.stats.current_depth_ms = current_buffered_frames * 20.0;
 
         if self.buffer.is_empty() {
             // Buffer starvation -> perform packet loss concealment
@@ -134,15 +148,13 @@ impl AdaptiveJitterBuffer {
             return PlaybackFrame::ConcealedPcm(plc_pcm);
         }
 
-        // Check next packet in sequence
+        // Check next packet in sequence using RFC 1982 serial number arithmetic
         if let Some(last_seq) = self.last_played_seq {
             let expected_next_seq = last_seq.wrapping_add(1);
             let front_seq = self.buffer.front().unwrap().seq;
             let seq_gap = front_seq.wrapping_sub(expected_next_seq) as i16;
 
             if seq_gap > 0 {
-                // There is a missing packet in the sequence!
-                // If the next available packet has arrived too recently, wait one cycle and conceal.
                 let oldest_arrival = self.buffer.front().unwrap().arrival_time;
                 let wait_duration = oldest_arrival.elapsed();
 
@@ -152,8 +164,8 @@ impl AdaptiveJitterBuffer {
                     let plc_pcm = self.synthesize_plc_pcm(expected_samples);
                     return PlaybackFrame::ConcealedPcm(plc_pcm);
                 } else {
-                    // Packet considered dropped permanently. Skip ahead to front_seq.
-                    self.stats.lost_packets += seq_gap as u64;
+                    // Bug 1.4: Saturating arithmetic prevents u64 underflow crash
+                    self.stats.lost_packets = self.stats.lost_packets.saturating_add(seq_gap as u64);
                 }
             }
         }
@@ -170,8 +182,7 @@ impl AdaptiveJitterBuffer {
     }
 
     /// Packet Loss Concealment (PLC):
-    /// Extrapolates previous speech frame with an exponential decay curve (0.8x)
-    /// to prevent audible clicks, robotic artifacts, or sudden silences.
+    /// Extrapolates previous speech frame with an exponential decay curve (0.78x)
     fn synthesize_plc_pcm(&mut self, samples_count: usize) -> Vec<i16> {
         if self.last_pcm_frame.is_empty() {
             return vec![0i16; samples_count];

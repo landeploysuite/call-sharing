@@ -17,6 +17,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
 
 class AudioRouteManager(private val context: Context) {
 
@@ -24,6 +26,7 @@ class AudioRouteManager(private val context: Context) {
     private var isSessionActive = false
     private var recordJob: Job? = null
     private var trackJob: Job? = null
+    private var focusRequest: AudioFocusRequest? = null
 
     private var audioRecord: AudioRecord? = null
     private var audioTrack: AudioTrack? = null
@@ -53,19 +56,53 @@ class AudioRouteManager(private val context: Context) {
         startAudioLoops()
     }
 
+    /// Bug 3.2: AudioFocusChangeListener implementation prevents AudioTrack write stalls
     private fun requestAudioFocus() {
-        val focusRequest = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_EXCLUSIVE)
-            .setAudioAttributes(
-                AudioAttributes.Builder()
-                    .setUsage(AudioAttributes.USAGE_VOICE_COMMUNICATION)
-                    .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
-                    .build()
-            )
-            .setOnAudioFocusChangeListener { focusChange ->
-                Log.d(TAG, "Audio focus changed: $focusChange")
+        val listener = AudioManager.OnAudioFocusChangeListener { focusChange ->
+            Log.d(TAG, "Audio focus changed: $focusChange")
+            when (focusChange) {
+                AudioManager.AUDIOFOCUS_LOSS,
+                AudioManager.AUDIOFOCUS_LOSS_TRANSIENT -> {
+                    Log.w(TAG, "Audio focus lost transiently. Pausing AudioTrack & muting mic to avoid write block.")
+                    try {
+                        audioTrack?.pause()
+                    } catch (e: Exception) {
+                        Log.e(TAG, "AudioTrack pause error: ${e.message}")
+                    }
+                    NativeBridge.setMicMute(true)
+                }
+                AudioManager.AUDIOFOCUS_GAIN -> {
+                    Log.i(TAG, "Audio focus regained. Resuming AudioTrack playback.")
+                    try {
+                        audioTrack?.play()
+                    } catch (e: Exception) {
+                        Log.e(TAG, "AudioTrack resume error: ${e.message}")
+                    }
+                    NativeBridge.setMicMute(false)
+                }
             }
-            .build()
-        audioManager.requestAudioFocus(focusRequest)
+        }
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val req = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_EXCLUSIVE)
+                .setAudioAttributes(
+                    AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_VOICE_COMMUNICATION)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                        .build()
+                )
+                .setOnAudioFocusChangeListener(listener)
+                .build()
+            focusRequest = req
+            audioManager.requestAudioFocus(req)
+        } else {
+            @Suppress("DEPRECATION")
+            audioManager.requestAudioFocus(
+                listener,
+                AudioManager.STREAM_VOICE_CALL,
+                AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_EXCLUSIVE
+            )
+        }
     }
 
     private fun selectOptimalCommunicationDevice() {
@@ -74,7 +111,6 @@ class AudioRouteManager(private val context: Context) {
             val earpiece = devices.find { it.type == AudioDeviceInfo.TYPE_BUILTIN_EARPIECE }
             val speaker = devices.find { it.type == AudioDeviceInfo.TYPE_BUILTIN_SPEAKER }
 
-            // Default to earpiece for private call; fallback to speaker
             val selected = earpiece ?: speaker
             if (selected != null) {
                 audioManager.setCommunicationDevice(selected)
@@ -100,6 +136,7 @@ class AudioRouteManager(private val context: Context) {
         }
     }
 
+    /// Bug 2.2: Zero-allocation direct ByteBuffer loops eliminating JNI Local Reference table overflows
     private fun startAudioLoops() {
         val minRecordBuf = AudioRecord.getMinBufferSize(SAMPLE_RATE, CHANNEL_IN, ENCODING)
         val recordBufSize = minRecordBuf.coerceAtLeast(FRAME_SIZE_BYTES * 4)
@@ -141,28 +178,33 @@ class AudioRouteManager(private val context: Context) {
 
         audioTrack?.play()
 
-        // 1. Microphone capture loop -> Rust native encoder & UDP streamer
+        // 1. Pre-allocated direct buffer mic capture loop
         recordJob = CoroutineScope(Dispatchers.IO).launch {
-            val pcmChunk = ByteArray(FRAME_SIZE_BYTES)
+            val directMicBuffer = ByteBuffer.allocateDirect(FRAME_SIZE_BYTES).order(ByteOrder.LITTLE_ENDIAN)
             while (isActive && isSessionActive) {
-                val bytesRead = audioRecord?.read(pcmChunk, 0, pcmChunk.size) ?: -1
+                directMicBuffer.clear()
+                val bytesRead = audioRecord?.read(directMicBuffer, FRAME_SIZE_BYTES) ?: -1
                 if (bytesRead > 0) {
-                    NativeBridge.processMicCapture(pcmChunk)
+                    NativeBridge.processMicCaptureDirect(directMicBuffer, bytesRead)
                 }
             }
         }
 
-        // 2. Playback loop <- Rust native jitter buffer & PLC -> AudioTrack
+        // 2. Pre-allocated direct buffer speaker playback loop
         trackJob = CoroutineScope(Dispatchers.IO).launch {
+            val directPlayBuffer = ByteBuffer.allocateDirect(FRAME_SIZE_BYTES).order(ByteOrder.LITTLE_ENDIAN)
             while (isActive && isSessionActive) {
-                val pcmSamples = NativeBridge.pullPlaybackPcm(FRAME_SIZE_SAMPLES)
-                if (pcmSamples.isNotEmpty()) {
-                    audioTrack?.write(pcmSamples, 0, pcmSamples.size, AudioTrack.WRITE_BLOCKING)
+                directPlayBuffer.clear()
+                val samplesPulled = NativeBridge.pullPlaybackPcmDirect(directPlayBuffer, FRAME_SIZE_SAMPLES)
+                if (samplesPulled > 0) {
+                    directPlayBuffer.position(0)
+                    directPlayBuffer.limit(samplesPulled * 2)
+                    audioTrack?.write(directPlayBuffer, samplesPulled * 2, AudioTrack.WRITE_BLOCKING)
                 }
             }
         }
 
-        Log.i(TAG, "Audio capture and playback pipelines running")
+        Log.i(TAG, "Zero-allocation direct buffer audio capture and playback pipelines active")
     }
 
     fun stopBridgedAudioSession() {
@@ -191,6 +233,11 @@ class AudioRouteManager(private val context: Context) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             audioManager.clearCommunicationDevice()
         }
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            focusRequest?.let { audioManager.abandonAudioFocusRequest(it) }
+        }
+
         audioManager.mode = AudioManager.MODE_NORMAL
         Log.i(TAG, "Hardware audio restored to MODE_NORMAL")
     }

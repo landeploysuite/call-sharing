@@ -2,16 +2,17 @@ package com.callshare.telecom
 
 import android.content.Intent
 import android.telecom.Call
+import android.telecom.CallAudioState
 import android.telecom.InCallService
 import android.telecom.VideoProfile
 import android.util.Log
 import com.callshare.native.NativeBridge
 import com.callshare.ui.AodActivity
-import com.callshare.ui.CallActivity
 
 class CallShareInCallService : InCallService() {
 
     private lateinit var audioRouteManager: AudioRouteManager
+    private var isLocallyAnsweredViaBluetooth = false
 
     companion object {
         private const val TAG = "CallShareInCallService"
@@ -50,6 +51,7 @@ class CallShareInCallService : InCallService() {
         currentCall = call
         val sessionId = "sim-call-${System.currentTimeMillis()}"
         currentSessionId = sessionId
+        isLocallyAnsweredViaBluetooth = false
 
         val callerNumber = call.details.handle?.schemeSpecificPart ?: "Unknown Caller"
         val callerName = call.details.callerDisplayName ?: callerNumber
@@ -61,18 +63,27 @@ class CallShareInCallService : InCallService() {
                 Log.d(TAG, "Call state changed: $state")
                 when (state) {
                     Call.STATE_RINGING -> {
-                        // Notify Rust native core -> dispatches CALL_INCOMING over offline Wi-Fi
                         NativeBridge.notifyLocalCallRinging(sessionId, callerNumber, callerName, 0)
                         launchAodCallOverlay(sessionId, callerNumber, callerName)
                     }
                     Call.STATE_ACTIVE -> {
-                        Log.i(TAG, "Call active: starting bridged audio session")
+                        // Bug 2.1: Detect if answered directly on host via Bluetooth headset
+                        if (isLocalBluetoothActive()) {
+                            Log.i(TAG, "Call answered locally on host via Bluetooth headset. Revoking remote P2P relay.")
+                            isLocallyAnsweredViaBluetooth = true
+                            NativeBridge.notifyCallAnsweredLocally(sessionId)
+                            return // Retain audio exclusively on local Bluetooth SCO link
+                        }
+
+                        Log.i(TAG, "Call active on Wi-Fi relay: starting bridged audio session")
                         audioRouteManager.startBridgedAudioSession()
                     }
                     Call.STATE_DISCONNECTED -> {
                         Log.i(TAG, "Call disconnected")
-                        audioRouteManager.stopBridgedAudioSession()
-                        NativeBridge.hangupCall(sessionId, "remote-hangup")
+                        if (!isLocallyAnsweredViaBluetooth) {
+                            audioRouteManager.stopBridgedAudioSession()
+                            NativeBridge.hangupCall(sessionId, "remote-hangup")
+                        }
                         currentCall = null
                         currentSessionId = null
                     }
@@ -84,6 +95,12 @@ class CallShareInCallService : InCallService() {
             NativeBridge.notifyLocalCallRinging(sessionId, callerNumber, callerName, 0)
             launchAodCallOverlay(sessionId, callerNumber, callerName)
         }
+    }
+
+    /// Bug 2.1: Ownership lock checking if local Bluetooth headset answered
+    private fun isLocalBluetoothActive(): Boolean {
+        val audioState = callAudioState ?: return false
+        return (audioState.route == CallAudioState.ROUTE_BLUETOOTH)
     }
 
     override fun onCallRemoved(call: Call) {

@@ -48,14 +48,12 @@ class AodActivity : AppCompatActivity(), SensorEventListener {
     private var currentSessionId: String? = null
     private var pulseAnimator: ObjectAnimator? = null
 
+    /// Bug 4.1: Decouple clock/battery IPC Binder calls from rendering; strict 1 FPS (1000ms) interval
     private val clockTickRunnable = object : Runnable {
         override fun run() {
             updateClockAndBattery()
             applyBurnInPixelShift()
-
-            // Refresh rate throttling: 1 FPS (1000ms) for idle clock, 33ms (30 FPS) for ringing pulse
-            val delayMs = if (isCallRinging) 33L else 1000L
-            mainHandler.postDelayed(this, delayMs)
+            mainHandler.postDelayed(this, 1000L)
         }
     }
 
@@ -67,9 +65,42 @@ class AodActivity : AppCompatActivity(), SensorEventListener {
         bindViews()
         setupSensors()
         updateOrientationState(resources.configuration.orientation)
+        setupCallEventListener()
 
         handleIntent(intent)
         mainHandler.post(clockTickRunnable)
+    }
+
+    private fun setupCallEventListener() {
+        NativeBridge.setCallEventListener(object : NativeBridge.CallEventListener {
+            override fun onRemoteCallRinging(sessionId: String, callerNumber: String, callerName: String, simSlot: Int) {
+                runOnUiThread {
+                    currentSessionId = sessionId
+                    showIncomingCallAlert(callerName, callerNumber)
+                }
+            }
+
+            override fun onCallConnected(sessionId: String) {
+                runOnUiThread {
+                    hideIncomingCallAlert()
+                }
+            }
+
+            override fun onCallTerminated(sessionId: String, reason: String) {
+                runOnUiThread {
+                    hideIncomingCallAlert()
+                }
+            }
+
+            override fun onCallRevoked(sessionId: String, reason: String) {
+                runOnUiThread {
+                    // Host answered locally on Bluetooth; dismiss AOD alert
+                    hideIncomingCallAlert()
+                }
+            }
+
+            override fun onPeersUpdated() {}
+        })
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -104,12 +135,10 @@ class AodActivity : AppCompatActivity(), SensorEventListener {
             WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON
         )
 
-        // Ultra-low brightness for LCD battery preservation
         val lp = window.attributes
         lp.screenBrightness = 0.01f
         window.attributes = lp
 
-        // Full screen immersive mode (hide system bars)
         window.decorView.systemUiVisibility = (
             View.SYSTEM_UI_FLAG_FULLSCREEN or
             View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or
@@ -177,13 +206,11 @@ class AodActivity : AppCompatActivity(), SensorEventListener {
             NativeBridge.onSensorStateChanged(isNear)
 
             if (isNear) {
-                // Screen blanked: phone in pocket or placed face-down
                 aodContainer.visibility = View.GONE
                 val lp = window.attributes
                 lp.screenBrightness = 0.0f
                 window.attributes = lp
             } else {
-                // Restore screen: phone picked up
                 aodContainer.visibility = View.VISIBLE
                 val lp = window.attributes
                 lp.screenBrightness = if (isCallRinging) 0.8f else 0.01f
@@ -212,27 +239,31 @@ class AodActivity : AppCompatActivity(), SensorEventListener {
         textClock.text = SimpleDateFormat("HH:mm", Locale.getDefault()).format(now)
         textDate.text = SimpleDateFormat("EEE, MMM d", Locale.getDefault()).format(now)
 
-        val bm = getSystemService(Context.BATTERY_SERVICE) as BatteryManager
-        val batteryPct = bm.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY)
-        textBattery.text = "$batteryPct%"
+        try {
+            val bm = getSystemService(Context.BATTERY_SERVICE) as? BatteryManager
+            val batteryPct = bm?.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY) ?: 100
+            textBattery.text = "$batteryPct%"
+        } catch (e: Exception) {
+            textBattery.text = "--%"
+        }
 
         textMeshStatus.text = "● P2P LAN Mesh Active"
     }
 
+    /// Bug 4.1: RenderThread GPU accelerated pulse animation without Main Thread IPC load
     private fun showIncomingCallAlert(callerName: String, callerNumber: String) {
+        isCallRinging = true
         layoutIncomingCall.visibility = View.VISIBLE
         textCallerName.text = callerName
         textCallerNumber.text = callerNumber
 
-        // Boost brightness for incoming call
         val lp = window.attributes
         lp.screenBrightness = 0.8f
         window.attributes = lp
 
-        // Smooth pulse animation (30 FPS)
         if (pulseAnimator == null) {
-            pulseAnimator = ObjectAnimator.ofFloat(layoutIncomingCall, "alpha", 0.5f, 1.0f).apply {
-                duration = 800
+            pulseAnimator = ObjectAnimator.ofFloat(layoutIncomingCall, "alpha", 0.45f, 1.0f).apply {
+                duration = 750
                 repeatMode = ValueAnimator.REVERSE
                 repeatCount = ValueAnimator.INFINITE
                 start()
@@ -261,7 +292,6 @@ class AodActivity : AppCompatActivity(), SensorEventListener {
 
         hideIncomingCallAlert()
 
-        // Transition to in-call activity
         val intent = Intent(this, CallActivity::class.java).apply {
             putExtra("EXTRA_SESSION_ID", sId)
             putExtra("EXTRA_CALLER_NAME", textCallerName.text.toString())

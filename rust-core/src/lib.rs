@@ -1,5 +1,6 @@
 //! CallShare Core Native JNI Runtime
 //! Orchestrates Audio Engine, Local LAN Networking, State Machine, and Universal AOD.
+//! Implements direct ByteBuffer memory exchange (Bug 2.2) and DPD Heartbeat Watchdog (Bug 1.3).
 
 pub mod audio;
 pub mod net;
@@ -9,11 +10,11 @@ pub mod state;
 use std::net::SocketAddr;
 use std::sync::{Arc, OnceLock};
 use jni::JNIEnv;
-use jni::objects::{JClass, JString, JByteArray};
+use jni::objects::{JClass, JString, JByteArray, JByteBuffer};
 use jni::sys::{jboolean, jint, jstring, jshortArray, jintArray};
 use parking_lot::Mutex;
 use tokio::runtime::Runtime;
-use log::{info, error};
+use log::{info, warn, error};
 
 use crate::audio::AudioPipeline;
 use crate::net::{DiscoveryEngine, PeerBeacon, SignalingEngine, SignalingMessage, UdpAudioStreamer, DEFAULT_SIGNALING_PORT, DEFAULT_MEDIA_PORT};
@@ -101,12 +102,26 @@ pub extern "system" fn Java_com_callshare_native_NativeBridge_initNativeCore(
     };
 
     let audio_pipeline = AudioPipeline::new();
-    let discovery = DiscoveryEngine::new(initial_beacon);
+    let (discovery, mut addr_update_rx) = DiscoveryEngine::new(initial_beacon);
     let (signaling, mut inbound_rx) = SignalingEngine::new(DEFAULT_SIGNALING_PORT);
     let udp_streamer = UdpAudioStreamer::new(DEFAULT_MEDIA_PORT, audio_pipeline.clone());
     let call_coordinator = CallSessionCoordinator::new(dev_id);
     let burn_in_engine = Mutex::new(BurnInShiftEngine::new());
     let sensor_governor = Mutex::new(SensorGovernor::new());
+
+    // Start Bug 1.3: Dead-Peer Detection (DPD) 500ms heartbeat loop
+    signaling.clone().start_dpd_monitor(call_coordinator.clone(), udp_streamer.clone());
+
+    // Start Bug 1.2: Dynamic DHCP re-allocation listener
+    let sig_dhcp = signaling.clone();
+    let streamer_dhcp = udp_streamer.clone();
+    rt.spawn(async move {
+        while let Ok(update) = addr_update_rx.recv().await {
+            info!("Dynamic DHCP update propagated to signaling & media: {}", update.new_ip);
+            sig_dhcp.set_peer_addr(update.signaling_addr);
+            streamer_dhcp.set_remote_target(Some(update.media_addr));
+        }
+    });
 
     // Spawn background task to process incoming signaling messages
     let coord = call_coordinator.clone();
@@ -127,6 +142,11 @@ pub extern "system" fn Java_com_callshare_native_NativeBridge_initNativeCore(
                 }
                 SignalingMessage::CallHangup { session_id, reason } => {
                     coord.on_call_terminated(&session_id, &reason);
+                    streamer.set_remote_target(None);
+                }
+                SignalingMessage::CallRevoked { session_id, reason } => {
+                    warn!("Host phone revoked call {}: {}", session_id, reason);
+                    coord.on_call_revoked_locally(&session_id);
                     streamer.set_remote_target(None);
                 }
                 _ => {}
@@ -174,8 +194,17 @@ pub extern "system" fn Java_com_callshare_native_NativeBridge_stopDiscovery(
 }
 
 #[no_mangle]
+pub extern "system" fn Java_com_callshare_native_NativeBridge_isApIsolated(
+    _env: JNIEnv,
+    _class: JClass,
+) -> jboolean {
+    let core = get_core();
+    if core.discovery.is_ap_isolated() { 1 } else { 0 }
+}
+
+#[no_mangle]
 pub extern "system" fn Java_com_callshare_native_NativeBridge_getDiscoveredPeersJson(
-    env: JNIEnv,
+    mut env: JNIEnv,
     _class: JClass,
 ) -> jstring {
     let core = get_core();
@@ -232,7 +261,6 @@ pub extern "system" fn Java_com_callshare_native_NativeBridge_notifyLocalCallRin
     );
 
     if accepted {
-        // Dispatch over local LAN signaling to peer device
         core.signaling.send_message(SignalingMessage::CallIncoming {
             session_id: s_id,
             caller_number: c_num,
@@ -244,6 +272,22 @@ pub extern "system" fn Java_com_callshare_native_NativeBridge_notifyLocalCallRin
     } else {
         0
     }
+}
+
+/// Bug 2.1: Host phone answered locally via Bluetooth; revoke remote relay
+#[no_mangle]
+pub extern "system" fn Java_com_callshare_native_NativeBridge_notifyCallAnsweredLocally(
+    mut env: JNIEnv,
+    _class: JClass,
+    session_id: JString,
+) {
+    let core = get_core();
+    let s_id: String = env.get_string(&session_id).map(|s| s.into()).unwrap_or_default();
+    core.call_coordinator.on_call_revoked_locally(&s_id);
+    core.signaling.send_message(SignalingMessage::CallRevoked {
+        session_id: s_id,
+        reason: "answered_locally_on_host".into(),
+    });
 }
 
 #[no_mangle]
@@ -334,7 +378,7 @@ pub extern "system" fn Java_com_callshare_native_NativeBridge_setDeviceOrientati
 
 #[no_mangle]
 pub extern "system" fn Java_com_callshare_native_NativeBridge_getAodShiftOffset(
-    env: JNIEnv,
+    mut env: JNIEnv,
     _class: JClass,
 ) -> jintArray {
     let core = get_core();
@@ -345,6 +389,56 @@ pub extern "system" fn Java_com_callshare_native_NativeBridge_getAodShiftOffset(
     j_arr.into_raw()
 }
 
+/// Bug 2.2: Zero-allocation direct ByteBuffer audio extraction preventing ART reference overflow
+#[no_mangle]
+pub extern "system" fn Java_com_callshare_native_NativeBridge_pullPlaybackPcmDirect(
+    mut env: JNIEnv,
+    _class: JClass,
+    direct_buffer: JByteBuffer,
+    samples_count: jint,
+) -> jint {
+    let core = get_core();
+    let samples = core.audio_pipeline.pull_playback_pcm(samples_count as usize);
+    let needed_bytes = samples.len() * 2;
+
+    if let Ok(addr) = env.get_direct_buffer_address(&direct_buffer) {
+        if let Ok(cap) = env.get_direct_buffer_capacity(&direct_buffer) {
+            if cap >= needed_bytes {
+                let dest_slice = unsafe { std::slice::from_raw_parts_mut(addr as *mut u8, needed_bytes) };
+                for (i, sample) in samples.iter().enumerate() {
+                    let bytes = sample.to_le_bytes();
+                    dest_slice[i * 2] = bytes[0];
+                    dest_slice[i * 2 + 1] = bytes[1];
+                }
+                return samples.len() as jint;
+            }
+        }
+    }
+    0
+}
+
+/// Bug 2.2: Zero-allocation direct ByteBuffer mic ingest
+#[no_mangle]
+pub extern "system" fn Java_com_callshare_native_NativeBridge_processMicCaptureDirect(
+    mut env: JNIEnv,
+    _class: JClass,
+    direct_buffer: JByteBuffer,
+    bytes_count: jint,
+) {
+    let core = get_core();
+    if let Ok(addr) = env.get_direct_buffer_address(&direct_buffer) {
+        let len = bytes_count as usize;
+        let u8_slice: &[u8] = unsafe { std::slice::from_raw_parts(addr as *const u8, len) };
+        if let Some(packet) = core.audio_pipeline.process_mic_capture(u8_slice) {
+            let streamer = core.udp_streamer.clone();
+            core.tokio_rt.spawn(async move {
+                streamer.send_voice_packet(&packet).await;
+            });
+        }
+    }
+}
+
+// Fallback legacy array APIs
 #[no_mangle]
 pub extern "system" fn Java_com_callshare_native_NativeBridge_processMicCapture(
     env: JNIEnv,
@@ -370,7 +464,7 @@ pub extern "system" fn Java_com_callshare_native_NativeBridge_processMicCapture(
 
 #[no_mangle]
 pub extern "system" fn Java_com_callshare_native_NativeBridge_pullPlaybackPcm(
-    env: JNIEnv,
+    mut env: JNIEnv,
     _class: JClass,
     samples_count: jint,
 ) -> jshortArray {

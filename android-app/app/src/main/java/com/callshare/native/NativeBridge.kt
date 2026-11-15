@@ -1,6 +1,7 @@
 package com.callshare.native
 
 import android.util.Log
+import java.nio.ByteBuffer
 
 object NativeBridge {
     private const val TAG = "CallShareNativeBridge"
@@ -22,6 +23,7 @@ object NativeBridge {
         fun onRemoteCallRinging(sessionId: String, callerNumber: String, callerName: String, simSlot: Int)
         fun onCallConnected(sessionId: String)
         fun onCallTerminated(sessionId: String, reason: String)
+        fun onCallRevoked(sessionId: String, reason: String)
         fun onPeersUpdated()
     }
 
@@ -45,6 +47,11 @@ object NativeBridge {
     @JvmStatic
     fun onNativeCallTerminated(sessionId: String, reason: String) {
         eventListener?.onCallTerminated(sessionId, reason)
+    }
+
+    @JvmStatic
+    fun onNativeCallRevoked(sessionId: String, reason: String) {
+        eventListener?.onCallRevoked(sessionId, reason)
     }
 
     // Safe wrappers preventing crash if native core is unavailable
@@ -100,6 +107,15 @@ object NativeBridge {
         }
     }
 
+    fun safeIsApIsolated(): Boolean {
+        if (!isLoaded) return false
+        return try {
+            isApIsolated()
+        } catch (e: Throwable) {
+            false
+        }
+    }
+
     // Native JNI Declarations with @JvmStatic
     @JvmStatic external fun initNativeCore(
         deviceId: String,
@@ -111,6 +127,7 @@ object NativeBridge {
 
     @JvmStatic external fun startDiscovery()
     @JvmStatic external fun stopDiscovery()
+    @JvmStatic external fun isApIsolated(): Boolean
     @JvmStatic external fun getDiscoveredPeersJson(): String
     @JvmStatic external fun connectToPeer(peerIp: String, signalingPort: Int, mediaPort: Int): Boolean
 
@@ -121,6 +138,8 @@ object NativeBridge {
         simSlot: Int
     ): Boolean
 
+    @JvmStatic external fun notifyCallAnsweredLocally(sessionId: String)
+
     @JvmStatic external fun answerRelayedCall(sessionId: String)
     @JvmStatic external fun rejectRelayedCall(sessionId: String, reason: String)
     @JvmStatic external fun hangupCall(sessionId: String, reason: String)
@@ -130,6 +149,11 @@ object NativeBridge {
     @JvmStatic external fun setDeviceOrientation(orientation: Int)
     @JvmStatic external fun getAodShiftOffset(): IntArray
 
+    // Bug 2.2: Zero-allocation direct ByteBuffer memory transfers
+    @JvmStatic external fun pullPlaybackPcmDirect(directBuffer: ByteBuffer, samplesCount: Int): Int
+    @JvmStatic external fun processMicCaptureDirect(directBuffer: ByteBuffer, bytesCount: Int)
+
+    // Fallback array JNI methods
     @JvmStatic external fun processMicCapture(pcmBytes: ByteArray)
     @JvmStatic external fun pullPlaybackPcm(samplesCount: Int): ShortArray
 }

@@ -1,5 +1,6 @@
 //! Symmetrical Bidirectional Call State Machine
 //! Coordinates local cellular calls and remote relayed calls across both peer phones.
+//! Handles ownership revocation to prevent dual-answer race conditions (Bug 2.1).
 
 use std::sync::Arc;
 use parking_lot::RwLock;
@@ -131,6 +132,13 @@ impl CallSessionCoordinator {
                 caller_number: caller_number.clone(),
             };
         }
+    }
+
+    /// Bug 2.1: Local host answered via Bluetooth/earpiece; revoke remote relay
+    pub fn on_call_revoked_locally(&self, session_id: &str) {
+        let mut state = self.state.write();
+        info!("Call {} revoked: answered locally on host phone", session_id);
+        *state = CallState::Idle;
     }
 
     /// Local user answers the relayed call from remote peer
