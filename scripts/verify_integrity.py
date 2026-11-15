@@ -16,7 +16,7 @@ RUST_LIB = ROOT_DIR / "rust-core" / "src" / "lib.rs"
 WORKFLOW_FILE = ROOT_DIR / ".github" / "workflows" / "build-apk.yml"
 
 def check_resources():
-    print("[1/5] Auditing Android XML Resources...")
+    print("[1/6] Auditing Android XML Resources...")
     colors_file = APP_RES_DIR / "values" / "colors.xml"
     strings_file = APP_RES_DIR / "values" / "strings.xml"
 
@@ -59,7 +59,7 @@ def check_resources():
     return True
 
 def check_jni_bindings():
-    print("[2/5] Auditing Rust-to-Kotlin JNI Declarations & Callbacks...")
+    print("[2/6] Auditing Rust-to-Kotlin JNI Declarations & Callbacks...")
     if not RUST_LIB.exists():
         print(f"FAILED: {RUST_LIB} not found.")
         return False
@@ -100,7 +100,7 @@ def check_jni_bindings():
     return True
 
 def check_cold_start_guards():
-    print("[3/5] Auditing Cold-Start Crash Prevention & Uncaught Exception Handlers...")
+    print("[3/6] Auditing Cold-Start Crash Prevention & Uncaught Exception Handlers...")
     app_kt = KOTLIN_DIR / "com" / "callshare" / "CallShareApp.kt"
     if not app_kt.exists():
         print("FAILED: CallShareApp.kt not found.")
@@ -127,7 +127,7 @@ def check_cold_start_guards():
     return True
 
 def check_cicd_pipeline():
-    print("[4/5] Auditing GitHub Actions CI/CD Pipeline Configuration...")
+    print("[4/6] Auditing GitHub Actions CI/CD Pipeline Configuration...")
     if not WORKFLOW_FILE.exists():
         print(f"FAILED: {WORKFLOW_FILE} not found.")
         return False
@@ -147,7 +147,7 @@ def check_cicd_pipeline():
     return True
 
 def check_rust_borrow_mutability():
-    print("[5/5] Auditing Rust Core Borrow Mutability & Attributes...")
+    print("[5/6] Auditing Rust Core Borrow Mutability & Attributes...")
     rust_content = RUST_LIB.read_text(encoding="utf-8")
     if "#![allow(unused_mut)]" not in rust_content:
         print("FAILED: rust-core/src/lib.rs lacks #![allow(unused_mut)] attribute.")
@@ -156,6 +156,54 @@ def check_rust_borrow_mutability():
         print("FAILED: Found temporary borrow pattern JValue::Object(&s_id.into()) causing E0716.")
         return False
     print("  ✓ Rust crate-level attributes and bound JObject arguments verified.")
+    return True
+
+def check_kotlin_imports():
+    print("[6/6] Auditing Kotlin Android Imports...")
+    common_android_classes = [
+        'View', 'ViewGroup', 'TextView', 'Button', 'EditText', 'ImageView', 'LinearLayout', 'ScrollView',
+        'FrameLayout', 'RelativeLayout', 'Toast', 'Intent', 'Context', 'Bundle', 'Log', 'Color',
+        'Handler', 'Looper', 'Process', 'Build', 'Uri', 'ByteBuffer', 'ByteOrder', 'Bitmap', 'BitmapFactory',
+        'Paint', 'Canvas', 'Typeface', 'Sensor', 'SensorEvent', 'SensorManager', 'SensorEventListener',
+        'AudioRecord', 'AudioTrack', 'AudioManager', 'AudioFormat', 'AudioAttributes', 'Notification',
+        'NotificationManager', 'PendingIntent', 'Service', 'IBinder', 'PowerManager', 'WifiManager',
+        'TelephonyManager', 'SubscriptionManager', 'TelecomManager', 'PhoneAccount', 'PhoneAccountHandle',
+        'Connection', 'ConnectionService', 'InCallService', 'Call', 'CallAudioState', 'DreamService',
+        'SharedPreferences', 'PackageManager', 'Manifest', 'RoleManager', 'AlertDialog', 'ClipData',
+        'ClipboardManager', 'ActivityInfo', 'Configuration', 'BatteryManager', 'WindowManager', 'SeekBar',
+        'SwitchCompat', 'RadioGroup', 'RadioButton'
+    ]
+    missing = []
+    for kt in KOTLIN_DIR.glob("**/*.kt"):
+        text = kt.read_text(encoding="utf-8")
+        no_comments = re.sub(r"//.*", "", text)
+        no_comments = re.sub(r"/\*[\s\S]*?\*/", "", no_comments)
+        no_strings = re.sub(r'"""[\s\S]*?"""', '', no_comments)
+        no_strings = re.sub(r'"(?:\\.|[^"\\])*"', '', no_strings)
+
+        imports = re.findall(r"import\s+([a-zA-Z0-9_.*]+)", no_strings)
+        import_set = set(imports)
+        code = re.sub(r"import\s+[^\n]+", "", no_strings)
+        code = re.sub(r"package\s+[^\n]+", "", code)
+
+        for cls in common_android_classes:
+            pattern = r"(?<![a-zA-Z0-9_.])" + cls + r"(?![a-zA-Z0-9_])"
+            matches = list(re.finditer(pattern, code))
+            if matches:
+                is_imported = any(imp.endswith("." + cls) or imp.endswith(".*") for imp in import_set)
+                is_defined_in_file = bool(re.search(r"\b(class|interface|object)\s+" + cls + r"\b", code))
+                if not is_imported and not is_defined_in_file:
+                    for m in matches:
+                        start = m.start()
+                        prefix = code[max(0, start-30):start]
+                        if not re.search(r"[a-zA-Z0-9_]+\.$", prefix):
+                            missing.append(f"{kt.name}: Missing import for {cls}")
+    if missing:
+        print(f"FAILED: Found {len(missing)} missing imports:")
+        for m in missing:
+            print(f"  - {m}")
+        return False
+    print("  ✓ All Kotlin source files have all Android classes properly imported.")
     return True
 
 def main():
@@ -167,11 +215,12 @@ def main():
         check_jni_bindings(),
         check_cold_start_guards(),
         check_cicd_pipeline(),
-        check_rust_borrow_mutability()
+        check_rust_borrow_mutability(),
+        check_kotlin_imports()
     ]
     print("=" * 60)
     if all(results):
-        print("✔ ALL 5 INTEGRITY AUDIT CHECKS PASSED WITH 0 ERRORS.")
+        print("✔ ALL 6 INTEGRITY AUDIT CHECKS PASSED WITH 0 ERRORS.")
         print("=" * 60)
         return 0
     else:
