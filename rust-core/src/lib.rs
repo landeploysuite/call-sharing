@@ -14,7 +14,7 @@ use std::net::SocketAddr;
 use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::sync::{Arc, OnceLock};
 use jni::JNIEnv;
-use jni::objects::{JByteArray, JByteBuffer, JClass, JObject, JString, JValue};
+use jni::objects::{GlobalRef, JByteArray, JByteBuffer, JClass, JObject, JString, JValue};
 use jni::sys::{jboolean, jint, jfloat, jstring, jshortArray, jintArray};
 use parking_lot::Mutex;
 use tokio::runtime::Runtime;
@@ -39,6 +39,7 @@ struct AppCore {
 static GLOBAL_CORE: OnceLock<AppCore> = OnceLock::new();
 static CORE_INIT_LOCK: Mutex<()> = Mutex::new(());
 static JAVA_VM: OnceLock<jni::JavaVM> = OnceLock::new();
+static BRIDGE_CLASS: OnceLock<GlobalRef> = OnceLock::new();
 
 /// Cached JavaVM initialization
 #[no_mangle]
@@ -61,33 +62,42 @@ fn dispatch_java_remote_call_ringing(session_id: &str, caller_number: &str, call
         Some(v) => v,
         None => return,
     };
+    let bridge_class = match BRIDGE_CLASS.get() {
+        Some(c) => c,
+        None => return,
+    };
     if let Ok(mut env) = vm.attach_current_thread() {
-        if let Ok(class) = env.find_class("com/callshare/native/NativeBridge") {
-            let Ok(s_id) = env.new_string(session_id) else { return; };
-            let Ok(c_num) = env.new_string(caller_number) else { return; };
-            let Ok(c_name) = env.new_string(caller_name) else { return; };
+        if env.exception_check().unwrap_or(false) {
+            let _ = env.exception_clear();
+        }
 
-            let s_id_obj: JObject = s_id.into();
-            let c_num_obj: JObject = c_num.into();
-            let c_name_obj: JObject = c_name.into();
+        let Ok(s_id) = env.new_string(session_id) else { return; };
+        let Ok(c_num) = env.new_string(caller_number) else { return; };
+        let Ok(c_name) = env.new_string(caller_name) else { return; };
 
-            let args = [
-                JValue::Object(&s_id_obj),
-                JValue::Object(&c_num_obj),
-                JValue::Object(&c_name_obj),
-                JValue::Int(sim_slot),
-            ];
+        let s_id_obj: JObject = s_id.into();
+        let c_num_obj: JObject = c_num.into();
+        let c_name_obj: JObject = c_name.into();
 
-            let _ = env.call_static_method(
-                &class,
-                "onNativeRemoteCallRinging",
-                "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;I)V",
-                &args,
-            );
+        let args = [
+            JValue::Object(&s_id_obj),
+            JValue::Object(&c_num_obj),
+            JValue::Object(&c_name_obj),
+            JValue::Int(sim_slot),
+        ];
 
-            if env.exception_check().unwrap_or(false) {
-                let _ = env.exception_clear();
-            }
+        let class_obj = bridge_class.as_obj();
+        let class_ref: &JClass = unsafe { &*(class_obj as *const JObject as *const JClass) };
+
+        let _ = env.call_static_method(
+            class_ref,
+            "onNativeRemoteCallRinging",
+            "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;I)V",
+            &args,
+        );
+
+        if env.exception_check().unwrap_or(false) {
+            let _ = env.exception_clear();
         }
     }
 }
@@ -97,20 +107,30 @@ fn dispatch_java_call_connected(session_id: &str) {
         Some(v) => v,
         None => return,
     };
+    let bridge_class = match BRIDGE_CLASS.get() {
+        Some(c) => c,
+        None => return,
+    };
     if let Ok(mut env) = vm.attach_current_thread() {
-        if let Ok(class) = env.find_class("com/callshare/native/NativeBridge") {
-            let Ok(s_id) = env.new_string(session_id) else { return; };
-            let s_id_obj: JObject = s_id.into();
+        if env.exception_check().unwrap_or(false) {
+            let _ = env.exception_clear();
+        }
 
-            let _ = env.call_static_method(
-                &class,
-                "onNativeCallConnected",
-                "(Ljava/lang/String;)V",
-                &[JValue::Object(&s_id_obj)],
-            );
-            if env.exception_check().unwrap_or(false) {
-                let _ = env.exception_clear();
-            }
+        let Ok(s_id) = env.new_string(session_id) else { return; };
+        let s_id_obj: JObject = s_id.into();
+
+        let class_obj = bridge_class.as_obj();
+        let class_ref: &JClass = unsafe { &*(class_obj as *const JObject as *const JClass) };
+
+        let _ = env.call_static_method(
+            class_ref,
+            "onNativeCallConnected",
+            "(Ljava/lang/String;)V",
+            &[JValue::Object(&s_id_obj)],
+        );
+
+        if env.exception_check().unwrap_or(false) {
+            let _ = env.exception_clear();
         }
     }
 }
@@ -120,23 +140,33 @@ fn dispatch_java_call_terminated(session_id: &str, reason: &str) {
         Some(v) => v,
         None => return,
     };
+    let bridge_class = match BRIDGE_CLASS.get() {
+        Some(c) => c,
+        None => return,
+    };
     if let Ok(mut env) = vm.attach_current_thread() {
-        if let Ok(class) = env.find_class("com/callshare/native/NativeBridge") {
-            let Ok(s_id) = env.new_string(session_id) else { return; };
-            let Ok(r_str) = env.new_string(reason) else { return; };
+        if env.exception_check().unwrap_or(false) {
+            let _ = env.exception_clear();
+        }
 
-            let s_id_obj: JObject = s_id.into();
-            let r_str_obj: JObject = r_str.into();
+        let Ok(s_id) = env.new_string(session_id) else { return; };
+        let Ok(r_str) = env.new_string(reason) else { return; };
 
-            let _ = env.call_static_method(
-                &class,
-                "onNativeCallTerminated",
-                "(Ljava/lang/String;Ljava/lang/String;)V",
-                &[JValue::Object(&s_id_obj), JValue::Object(&r_str_obj)],
-            );
-            if env.exception_check().unwrap_or(false) {
-                let _ = env.exception_clear();
-            }
+        let s_id_obj: JObject = s_id.into();
+        let r_str_obj: JObject = r_str.into();
+
+        let class_obj = bridge_class.as_obj();
+        let class_ref: &JClass = unsafe { &*(class_obj as *const JObject as *const JClass) };
+
+        let _ = env.call_static_method(
+            class_ref,
+            "onNativeCallTerminated",
+            "(Ljava/lang/String;Ljava/lang/String;)V",
+            &[JValue::Object(&s_id_obj), JValue::Object(&r_str_obj)],
+        );
+
+        if env.exception_check().unwrap_or(false) {
+            let _ = env.exception_clear();
         }
     }
 }
@@ -146,23 +176,33 @@ fn dispatch_java_call_revoked(session_id: &str, reason: &str) {
         Some(v) => v,
         None => return,
     };
+    let bridge_class = match BRIDGE_CLASS.get() {
+        Some(c) => c,
+        None => return,
+    };
     if let Ok(mut env) = vm.attach_current_thread() {
-        if let Ok(class) = env.find_class("com/callshare/native/NativeBridge") {
-            let Ok(s_id) = env.new_string(session_id) else { return; };
-            let Ok(r_str) = env.new_string(reason) else { return; };
+        if env.exception_check().unwrap_or(false) {
+            let _ = env.exception_clear();
+        }
 
-            let s_id_obj: JObject = s_id.into();
-            let r_str_obj: JObject = r_str.into();
+        let Ok(s_id) = env.new_string(session_id) else { return; };
+        let Ok(r_str) = env.new_string(reason) else { return; };
 
-            let _ = env.call_static_method(
-                &class,
-                "onNativeCallRevoked",
-                "(Ljava/lang/String;Ljava/lang/String;)V",
-                &[JValue::Object(&s_id_obj), JValue::Object(&r_str_obj)],
-            );
-            if env.exception_check().unwrap_or(false) {
-                let _ = env.exception_clear();
-            }
+        let s_id_obj: JObject = s_id.into();
+        let r_str_obj: JObject = r_str.into();
+
+        let class_obj = bridge_class.as_obj();
+        let class_ref: &JClass = unsafe { &*(class_obj as *const JObject as *const JClass) };
+
+        let _ = env.call_static_method(
+            class_ref,
+            "onNativeCallRevoked",
+            "(Ljava/lang/String;Ljava/lang/String;)V",
+            &[JValue::Object(&s_id_obj), JValue::Object(&r_str_obj)],
+        );
+
+        if env.exception_check().unwrap_or(false) {
+            let _ = env.exception_clear();
         }
     }
 }
@@ -184,10 +224,20 @@ pub extern "system" fn Java_com_callshare_native_NativeBridge_initNativeCore(
     catch_unwind(AssertUnwindSafe(|| {
         let _guard = CORE_INIT_LOCK.lock();
 
-        // Cache JavaVM if not already set by JNI_OnLoad
+        // 1. Cache JavaVM if not already set by JNI_OnLoad
         if JAVA_VM.get().is_none() {
             if let Ok(vm) = env.get_java_vm() {
                 let _ = JAVA_VM.set(vm);
+            }
+        }
+
+        // 2. Cache NativeBridge JClass as GlobalRef so background threads never call find_class
+        if BRIDGE_CLASS.get().is_none() {
+            if let Ok(global_ref) = env.new_global_ref(&_class) {
+                let _ = BRIDGE_CLASS.set(global_ref);
+                info!("Cached NativeBridge JClass GlobalRef successfully");
+            } else {
+                error!("Failed to create GlobalRef for NativeBridge JClass");
             }
         }
 

@@ -20,15 +20,20 @@ object NativeBridge {
     var nativeLoadError: String? = null
         private set
 
-    init {
-        try {
+    @Synchronized
+    fun ensureLoaded(): Boolean {
+        if (isNativeLoaded) return true
+        return try {
             System.loadLibrary("callshare_core")
             isNativeLoaded = true
-            Log.i(TAG, "libcallshare_core.so loaded successfully")
+            nativeLoadError = null
+            Log.i(TAG, "libcallshare_core.so loaded successfully via ensureLoaded()")
+            true
         } catch (t: Throwable) {
             isNativeLoaded = false
             nativeLoadError = t.stackTraceToString()
-            Log.e(TAG, "Failed to load libcallshare_core.so native library:\n$nativeLoadError")
+            Log.e(TAG, "Failed to load libcallshare_core.so:\n$nativeLoadError")
+            false
         }
     }
 

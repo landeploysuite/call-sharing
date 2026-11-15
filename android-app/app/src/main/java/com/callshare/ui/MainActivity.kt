@@ -82,10 +82,46 @@ class MainActivity : AppCompatActivity() {
             showStartupErrorDialog("View Binding", t)
         }
 
-        // 4. Register / verify Telecom PhoneAccount defensively
+        // 4. Post-Delay Subsystem Startup: Ensure UI is completely drawn and interactive FIRST
+        window.decorView.postDelayed({
+            initSubsystemsAsync()
+        }, 500)
+    }
+
+    private fun initSubsystemsAsync() {
+        if (isFinishing || isDestroyed) return
+
+        // 1. Acquire Wi-Fi Multicast Lock safely
+        try {
+            CallShareApp.instance.acquireMulticastLockSafely()
+        } catch (t: Throwable) {
+            Log.w("MainActivity", "Multicast lock deferred: ${t.message}")
+        }
+
+        // 2. Ensure Native Bridge library is loaded
+        val nativeLoaded = try {
+            NativeBridge.ensureLoaded()
+        } catch (t: Throwable) {
+            Log.e("MainActivity", "NativeBridge.ensureLoaded() failure: ${t.message}")
+            false
+        }
+
+        if (nativeLoaded) {
+            try {
+                CallShareApp.instance.initRustNativeCore()
+            } catch (t: Throwable) {
+                Log.e("MainActivity", "initRustNativeCore failure: ${t.message}")
+                showStartupErrorDialog("Rust Core", t)
+            }
+        } else {
+            val error = NativeBridge.nativeLoadError ?: "Native core not loaded"
+            Log.w("MainActivity", "Native library deferred: $error")
+        }
+
+        // 3. Register / verify Telecom PhoneAccount defensively
         guardRegisterTelecomPhoneAccount()
 
-        // 5. Request runtime permissions defensively
+        // 4. Request runtime permissions defensively
         try {
             requestAppPermissions()
         } catch (t: Throwable) {
@@ -93,12 +129,11 @@ class MainActivity : AppCompatActivity() {
             showStartupErrorDialog("Permissions", t)
         }
 
-        // 6. Refresh Dashboard UI
+        // 5. Refresh Dashboard UI
         try {
             refreshDashboard()
         } catch (t: Throwable) {
             Log.e("MainActivity", "Dashboard refresh failure: ${t.message}", t)
-            showStartupErrorDialog("Dashboard Refresh", t)
         }
     }
 

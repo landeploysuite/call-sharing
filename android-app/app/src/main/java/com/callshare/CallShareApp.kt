@@ -34,18 +34,34 @@ class CallShareApp : Application() {
         // 1. Install On-Screen Crash Catcher at the very top of onCreate()
         installCrashCatcher()
 
-        // 2. Wrap Wi-Fi MulticastLock in defensive try-catch
-        try {
-            acquireMulticastLock()
-        } catch (e: Throwable) {
-            Log.e(TAG, "MulticastLock acquisition bypassed: ${e.message}")
-        }
+        // 2. Safe notification channel creation for background services
+        createNotificationChannels()
+    }
 
-        // 3. Wrap Native Core initialization in defensive try-catch
-        try {
-            initRustNativeCore()
-        } catch (e: Throwable) {
-            Log.e(TAG, "Native core initialization deferred: ${e.message}")
+    private fun createNotificationChannels() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            try {
+                val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as? android.app.NotificationManager ?: return
+                val serviceChannel = android.app.NotificationChannel(
+                    "callshare_mesh_channel",
+                    "CallShare Mesh Relay Service",
+                    android.app.NotificationManager.IMPORTANCE_LOW
+                ).apply {
+                    description = "Persistent low-latency P2P mesh relay notification"
+                }
+                val callChannel = android.app.NotificationChannel(
+                    "callshare_call_channel",
+                    "CallShare Relayed Calls",
+                    android.app.NotificationManager.IMPORTANCE_HIGH
+                ).apply {
+                    description = "Incoming and active relayed P2P call alerts"
+                }
+                notificationManager.createNotificationChannel(serviceChannel)
+                notificationManager.createNotificationChannel(callChannel)
+                Log.i(TAG, "Notification channels registered successfully")
+            } catch (e: Throwable) {
+                Log.w(TAG, "Notification channel creation bypassed: ${e.message}")
+            }
         }
     }
 
@@ -91,6 +107,14 @@ class CallShareApp : Application() {
         prefs.edit().remove(KEY_CRASH_LOG).remove(KEY_CRASH_TIMESTAMP).apply()
     }
 
+    fun acquireMulticastLockSafely() {
+        try {
+            acquireMulticastLock()
+        } catch (e: Throwable) {
+            Log.e(TAG, "MulticastLock acquisition bypassed: ${e.message}")
+        }
+    }
+
     private fun acquireMulticastLock() {
         val wifiManager = applicationContext.getSystemService(Context.WIFI_SERVICE) as? WifiManager
         multicastLock = wifiManager?.createMulticastLock("CallShareMulticastLock")?.apply {
@@ -102,8 +126,8 @@ class CallShareApp : Application() {
 
     fun initRustNativeCore() {
         try {
-            if (!NativeBridge.isLoaded) {
-                Log.w(TAG, "Native library not ready yet")
+            if (!NativeBridge.ensureLoaded()) {
+                Log.w(TAG, "Native library not ready yet: ${NativeBridge.nativeLoadError}")
                 return
             }
 
