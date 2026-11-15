@@ -76,6 +76,14 @@
             android:exported="false"
             android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize" />
 
+        <!-- Programmatic Crash Reporter Activity (Runs in isolated process to survive fatal VM crashes) -->
+        <activity
+            android:name=".ui.CrashActivity"
+            android:exported="false"
+            android:process=":crash_reporter"
+            android:theme="@style/Theme.CallShare"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize" />
+
         <!-- Android Telecom InCallService Companion -->
         <service
             android:name=".telecom.CallShareInCallService"

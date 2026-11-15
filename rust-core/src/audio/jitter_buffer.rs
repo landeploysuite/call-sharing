@@ -151,26 +151,33 @@ impl AdaptiveJitterBuffer {
         // Check next packet in sequence using RFC 1982 serial number arithmetic
         if let Some(last_seq) = self.last_played_seq {
             let expected_next_seq = last_seq.wrapping_add(1);
-            let front_seq = self.buffer.front().unwrap().seq;
-            let seq_gap = front_seq.wrapping_sub(expected_next_seq) as i16;
+            if let Some(front) = self.buffer.front() {
+                let front_seq = front.seq;
+                let seq_gap = front_seq.wrapping_sub(expected_next_seq) as i16;
 
-            if seq_gap > 0 {
-                let oldest_arrival = self.buffer.front().unwrap().arrival_time;
-                let wait_duration = oldest_arrival.elapsed();
+                if seq_gap > 0 {
+                    let wait_duration = front.arrival_time.elapsed();
 
-                if wait_duration < Duration::from_millis(self.target_delay_ms as u64) {
-                    // Conceal and give missing packet chance to arrive
-                    self.stats.concealed_frames += 1;
-                    let plc_pcm = self.synthesize_plc_pcm(expected_samples);
-                    return PlaybackFrame::ConcealedPcm(plc_pcm);
-                } else {
-                    // Bug 1.4: Saturating arithmetic prevents u64 underflow crash
-                    self.stats.lost_packets = self.stats.lost_packets.saturating_add(seq_gap as u64);
+                    if wait_duration < Duration::from_millis(self.target_delay_ms as u64) {
+                        // Conceal and give missing packet chance to arrive
+                        self.stats.concealed_frames += 1;
+                        let plc_pcm = self.synthesize_plc_pcm(expected_samples);
+                        return PlaybackFrame::ConcealedPcm(plc_pcm);
+                    } else {
+                        // Bug 1.4: Saturating arithmetic prevents u64 underflow crash
+                        self.stats.lost_packets = self.stats.lost_packets.saturating_add(seq_gap as u64);
+                    }
                 }
             }
         }
 
-        let packet = self.buffer.pop_front().unwrap();
+        let packet = match self.buffer.pop_front() {
+            Some(p) => p,
+            None => {
+                let plc_pcm = self.synthesize_plc_pcm(expected_samples);
+                return PlaybackFrame::ConcealedPcm(plc_pcm);
+            }
+        };
         self.last_played_seq = Some(packet.seq);
         PlaybackFrame::ValidPacket(packet)
     }

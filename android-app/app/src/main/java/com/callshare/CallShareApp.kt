@@ -2,11 +2,13 @@ package com.callshare
 
 import android.app.Application
 import android.content.Context
+import android.content.Intent
 import android.net.wifi.WifiManager
 import android.os.Build
 import android.telephony.TelephonyManager
 import android.util.Log
 import com.callshare.native.NativeBridge
+import com.callshare.ui.CrashActivity
 import java.net.Inet4Address
 import java.net.NetworkInterface
 import java.util.UUID
@@ -63,8 +65,19 @@ class CallShareApp : Application() {
                 Log.e(TAG, "Failed to persist crash log to SharedPreferences: ${t.message}")
             }
 
-            // Forward to system default handler to complete OS crash lifecycle cleanly
-            defaultHandler?.uncaughtException(thread, throwable)
+            try {
+                val crashIntent = Intent(this, CrashActivity::class.java).apply {
+                    putExtra(CrashActivity.EXTRA_STACK_TRACE, stackTrace)
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
+                }
+                startActivity(crashIntent)
+            } catch (t: Throwable) {
+                Log.e(TAG, "Failed to launch CrashActivity directly: ${t.message}")
+            }
+
+            // Terminate the crashing process cleanly so CrashActivity (in :crash_reporter process) displays
+            android.os.Process.killProcess(android.os.Process.myPid())
+            System.exit(10)
         }
     }
 

@@ -79,7 +79,7 @@ class MainActivity : AppCompatActivity() {
             bindViews()
         } catch (t: Throwable) {
             Log.e("MainActivity", "View binding failure: ${t.message}", t)
-            Toast.makeText(this, "UI binding warning: ${t.message}", Toast.LENGTH_LONG).show()
+            showStartupErrorDialog("View Binding", t)
         }
 
         // 4. Register / verify Telecom PhoneAccount defensively
@@ -90,6 +90,7 @@ class MainActivity : AppCompatActivity() {
             requestAppPermissions()
         } catch (t: Throwable) {
             Log.e("MainActivity", "Permission request failure: ${t.message}", t)
+            showStartupErrorDialog("Permissions", t)
         }
 
         // 6. Refresh Dashboard UI
@@ -97,6 +98,25 @@ class MainActivity : AppCompatActivity() {
             refreshDashboard()
         } catch (t: Throwable) {
             Log.e("MainActivity", "Dashboard refresh failure: ${t.message}", t)
+            showStartupErrorDialog("Dashboard Refresh", t)
+        }
+    }
+
+    private fun showStartupErrorDialog(step: String, t: Throwable) {
+        try {
+            val trace = Log.getStackTraceString(t)
+            AlertDialog.Builder(this)
+                .setTitle("Startup Warning: $step")
+                .setMessage("An exception occurred during startup ($step):\n\n${t.message}\n\n${trace.take(500)}...")
+                .setPositiveButton("Copy Trace") { _, _ ->
+                    val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                    clipboard.setPrimaryClip(ClipData.newPlainText("Startup Error", trace))
+                    Toast.makeText(this, "Copied to clipboard", Toast.LENGTH_SHORT).show()
+                }
+                .setNegativeButton("Continue", null)
+                .show()
+        } catch (dialogEx: Throwable) {
+            Log.e("MainActivity", "Failed to show startup dialog: ${dialogEx.message}")
         }
     }
 

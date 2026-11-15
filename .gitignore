@@ -1,0 +1,38 @@
+# Build artifacts
+*.apk
+*.ap_
+*.aab
+
+# Gradle
+.gradle/
+build/
+android-app/build/
+android-app/app/build/
+android-app/.gradle/
+
+# Never ignore gradle wrapper jar
+!**/gradle-wrapper.jar
+!gradle/wrapper/gradle-wrapper.jar
+!android-app/gradle/wrapper/gradle-wrapper.jar
+
+# Rust / Cargo
+rust-core/target/
+**/target/
+Cargo.lock
+
+# Android Studio / IntelliJ / Eclipse / VS Code
+*.iml
+.idea/
+.vscode/
+.navigation/
+captures/
+local.properties
+.externalNativeBuild/
+.cxx/
+
+# OS / Scratch
+.DS_Store
+Thumbs.db
+*.swp
+*.bak
+*~
