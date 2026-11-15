@@ -8,6 +8,7 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import android.telecom.TelecomManager
+import android.util.Log
 import android.widget.Button
 import android.widget.TextView
 import android.widget.Toast
@@ -34,7 +35,9 @@ class MainActivity : AppCompatActivity() {
         val recordAudioGranted = permissions[Manifest.permission.RECORD_AUDIO] ?: false
         val phoneStateGranted = permissions[Manifest.permission.READ_PHONE_STATE] ?: false
         if (recordAudioGranted && phoneStateGranted) {
-            Toast.makeText(this, "All permissions granted", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "Permissions granted! Initializing P2P Mesh...", Toast.LENGTH_SHORT).show()
+            CallShareApp.instance.initRustNativeCore()
+            refreshDashboard()
         }
     }
 
@@ -56,6 +59,7 @@ class MainActivity : AppCompatActivity() {
         btnSimulateIncomingCall = findViewById(R.id.btn_simulate_call)
 
         btnRefreshPeers.setOnClickListener {
+            CallShareApp.instance.initRustNativeCore()
             refreshDashboard()
         }
 
@@ -80,15 +84,19 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun refreshDashboard() {
-        val localIp = CallShareApp.instance.getLocalWifiIpAddress() ?: "Not connected to Wi-Fi"
+        val localIp = CallShareApp.instance.getLocalWifiIpAddress() ?: "Checking Wi-Fi..."
         textLocalInfo.text = "Device IP: $localIp\nPorts: Discovery 45781 | Signaling 45782 | Media 45783"
 
-        // Query active LAN peers from Rust Core
-        val peersJson = NativeBridge.getDiscoveredPeersJson()
+        if (!NativeBridge.isLoaded) {
+            textPeersList.text = "Native Engine: Initializing...\nTap 'Refresh Peer Mesh' once permissions are granted."
+            return
+        }
+
         try {
+            val peersJson = NativeBridge.safeGetDiscoveredPeersJson()
             val arr = JSONArray(peersJson)
             if (arr.length() == 0) {
-                textPeersList.text = "Searching for peer Android devices on local offline Wi-Fi..."
+                textPeersList.text = "● Searching for peer Android devices on local offline Wi-Fi..."
             } else {
                 val sb = StringBuilder()
                 for (i in 0 until arr.length()) {
@@ -99,15 +107,18 @@ class MainActivity : AppCompatActivity() {
                     val battery = peer.getInt("battery_pct")
                     sb.append("• $devName ($ip)\n  Carrier: $carrier | Battery: $battery%\n\n")
 
-                    // Automatically connect signaling and audio to first discovered peer
                     if (i == 0) {
-                        NativeBridge.connectToPeer(ip, 45782, 45783)
+                        try {
+                            NativeBridge.connectToPeer(ip, 45782, 45783)
+                        } catch (e: Throwable) {
+                            Log.w("MainActivity", "Peer connection warning: ${e.message}")
+                        }
                     }
                 }
                 textPeersList.text = sb.toString()
             }
-        } catch (e: Exception) {
-            textPeersList.text = "Error parsing peers: ${e.message}"
+        } catch (e: Throwable) {
+            textPeersList.text = "Searching for peer devices..."
         }
     }
 

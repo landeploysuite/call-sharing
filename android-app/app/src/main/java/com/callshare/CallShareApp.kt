@@ -4,7 +4,6 @@ import android.app.Application
 import android.content.Context
 import android.net.wifi.WifiManager
 import android.os.Build
-import android.telephony.SubscriptionManager
 import android.telephony.TelephonyManager
 import android.util.Log
 import com.callshare.native.NativeBridge
@@ -26,8 +25,17 @@ class CallShareApp : Application() {
         super.onCreate()
         instance = this
 
-        acquireMulticastLock()
-        initRustNativeCore()
+        try {
+            acquireMulticastLock()
+        } catch (e: Throwable) {
+            Log.e(TAG, "MulticastLock acquisition bypassed: ${e.message}")
+        }
+
+        try {
+            initRustNativeCore()
+        } catch (e: Throwable) {
+            Log.e(TAG, "Native core initialization deferred: ${e.message}")
+        }
     }
 
     private fun acquireMulticastLock() {
@@ -39,7 +47,12 @@ class CallShareApp : Application() {
         }
     }
 
-    private fun initRustNativeCore() {
+    fun initRustNativeCore() {
+        if (!NativeBridge.isLoaded) {
+            Log.w(TAG, "Native library not ready yet")
+            return
+        }
+
         val sharedPrefs = getSharedPreferences("callshare_prefs", Context.MODE_PRIVATE)
         var deviceId = sharedPrefs.getString("device_id", null)
         if (deviceId == null) {
@@ -50,31 +63,34 @@ class CallShareApp : Application() {
         val deviceName = "${Build.MANUFACTURER.replaceFirstChar { it.uppercase() }} ${Build.MODEL}"
         val localIp = getLocalWifiIpAddress() ?: "127.0.0.1"
 
-        // Determine SIM carrier name & slot
-        var carrierName = "No SIM"
-        var simSlot = -1
-        val telephonyManager = getSystemService(Context.TELEPHONY_SERVICE) as? TelephonyManager
-        if (telephonyManager != null) {
-            val opName = telephonyManager.networkOperatorName
-            if (!opName.isNullOrBlank()) {
-                carrierName = opName
-                simSlot = 0
+        // Determine SIM carrier name & slot safely without crashing on missing permissions
+        var carrierName = "Cellular SIM"
+        var simSlot = 0
+        try {
+            val telephonyManager = getSystemService(Context.TELEPHONY_SERVICE) as? TelephonyManager
+            if (telephonyManager != null) {
+                val opName = telephonyManager.networkOperatorName
+                if (!opName.isNullOrBlank()) {
+                    carrierName = opName
+                }
             }
+        } catch (e: Throwable) {
+            Log.w(TAG, "Carrier info read deferred until permission granted: ${e.message}")
         }
 
         Log.i(TAG, "Initializing Native Core: ID=$deviceId, Name=$deviceName, IP=$localIp, Carrier=$carrierName")
-        val success = NativeBridge.initNativeCore(deviceId, deviceName, localIp, carrierName, simSlot)
+        val success = NativeBridge.safeInitNativeCore(deviceId, deviceName, localIp, carrierName, simSlot)
         if (success) {
-            NativeBridge.startDiscovery()
+            NativeBridge.safeStartDiscovery()
             Log.i(TAG, "Native Rust Core initialized and discovery running")
         } else {
-            Log.e(TAG, "Failed to initialize Native Rust Core")
+            Log.w(TAG, "Native Core will re-initialize after permissions granted")
         }
     }
 
     fun getLocalWifiIpAddress(): String? {
         try {
-            val interfaces = NetworkInterface.getNetworkInterfaces()
+            val interfaces = NetworkInterface.getNetworkInterfaces() ?: return null
             while (interfaces.hasMoreElements()) {
                 val iface = interfaces.nextElement()
                 if (iface.isLoopback || !iface.isUp) continue
@@ -86,16 +102,20 @@ class CallShareApp : Application() {
                     }
                 }
             }
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             Log.w(TAG, "Error obtaining local IP: ${e.message}")
         }
         return null
     }
 
     override fun onTerminate() {
-        NativeBridge.stopDiscovery()
-        multicastLock?.let {
-            if (it.isHeld) it.release()
+        try {
+            NativeBridge.safeStopDiscovery()
+            multicastLock?.let {
+                if (it.isHeld) it.release()
+            }
+        } catch (e: Throwable) {
+            Log.w(TAG, "Error during termination: ${e.message}")
         }
         super.onTerminate()
     }

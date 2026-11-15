@@ -198,7 +198,7 @@ class AodActivity : AppCompatActivity(), SensorEventListener {
     // ANTI-BURN-IN PIXEL SHIFTING
     // -------------------------------------------------------------------------
     private fun applyBurnInPixelShift() {
-        val offsets = NativeBridge.getAodShiftOffset()
+        val offsets = NativeBridge.safeGetAodShiftOffset()
         if (offsets.size >= 2) {
             val dx = offsets[0].toFloat()
             val dy = offsets[1].toFloat()
