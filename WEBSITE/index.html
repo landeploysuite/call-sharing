@@ -1,0 +1,901 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CallShare P2P — Offline Call-Relay &amp; Universal AOD System</title>
+  
+  <!-- Browser Favicon using croped.png -->
+  <link rel="icon" type="image/png" href="croped.png" />
+  
+  <!-- Google Fonts: Inter & JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            amoled: '#000000',
+            obsidian: '#070A0F',
+            'obsidian-glass': '#0D121D',
+            borderline: '#152033',
+            emerald: {
+              400: '#34D399',
+              500: '#10B981',
+              600: '#059669',
+            },
+            cyan: {
+              400: '#22D3EE',
+              500: '#06B6D4',
+              600: '#0891B2',
+            },
+            amber: {
+              400: '#FBBF24',
+              500: '#F59E0B',
+            }
+          },
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+            mono: ['"JetBrains Mono"', 'monospace'],
+          }
+        }
+      }
+    };
+  </script>
+
+  <!-- Lucide Icons CDN -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <style>
+    /* Custom glow and utility classes */
+    .glow-emerald {
+      box-shadow: 0 0 25px rgba(16, 185, 129, 0.25);
+    }
+    .glow-cyan {
+      box-shadow: 0 0 25px rgba(6, 182, 212, 0.25);
+    }
+    .glow-card {
+      box-shadow: 0 0 40px rgba(0, 0, 0, 0.8), 0 0 15px rgba(16, 185, 129, 0.05);
+    }
+    .text-glow-emerald {
+      text-shadow: 0 0 12px rgba(16, 185, 129, 0.5);
+    }
+    .text-glow-cyan {
+      text-shadow: 0 0 12px rgba(6, 182, 212, 0.5);
+    }
+    /* Custom scrollbar */
+    ::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #000000;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #152033;
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #10B981;
+    }
+  </style>
+</head>
+
+<body class="bg-[#000000] text-slate-100 font-sans selection:bg-emerald-500/30 selection:text-emerald-200 antialiased overflow-x-hidden min-h-screen">
+
+  <!-- ===================================================================== -->
+  <!-- 1. NAVIGATION BAR & BRANDING                                          -->
+  <!-- ===================================================================== -->
+  <header class="sticky top-0 z-50 bg-[#000000]/90 backdrop-blur-xl border-b border-[#152033]/80 px-4 sm:px-8 py-3.5 transition-all">
+    <div class="max-w-7xl mx-auto flex items-center justify-between">
+      
+      <!-- Brand Logo & Name -->
+      <a href="#" class="flex items-center gap-3 group">
+        <div class="relative w-10 h-10 rounded-xl overflow-hidden border border-emerald-500/40 glow-emerald transition-transform group-hover:scale-105">
+          <img src="croped.png" alt="CallShare P2P Icon" class="w-full h-full object-cover" />
+        </div>
+        <div class="flex flex-col">
+          <div class="flex items-center gap-2">
+            <span class="font-extrabold text-base tracking-tight text-white group-hover:text-emerald-400 transition-colors">
+              CallShare <span class="text-cyan-400 font-mono">P2P</span>
+            </span>
+            <span class="text-[9px] font-mono px-1.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 uppercase tracking-widest hidden sm:inline-block">
+              Rust NDK
+            </span>
+          </div>
+          <span class="text-[10px] text-slate-400 font-mono hidden md:inline">
+            Offline Call-Relay &amp; Universal AOD
+          </span>
+        </div>
+      </a>
+
+      <!-- Navigation Links -->
+      <nav class="hidden lg:flex items-center gap-6 text-xs font-mono text-slate-300">
+        <a href="#features" class="hover:text-emerald-400 transition-colors flex items-center gap-1.5">
+          <i data-lucide="cpu" class="w-3.5 h-3.5 text-emerald-400"></i> Core Features
+        </a>
+        <a href="#architecture" class="hover:text-cyan-400 transition-colors flex items-center gap-1.5">
+          <i data-lucide="network" class="w-3.5 h-3.5 text-cyan-400"></i> System Architecture
+        </a>
+        <a href="#aod-studio" class="hover:text-emerald-400 transition-colors flex items-center gap-1.5">
+          <i data-lucide="smartphone" class="w-3.5 h-3.5 text-emerald-400"></i> Universal AOD Studio
+        </a>
+        <a href="#protocol" class="hover:text-cyan-400 transition-colors flex items-center gap-1.5">
+          <i data-lucide="terminal" class="w-3.5 h-3.5 text-cyan-400"></i> LAN Protocol &amp; Build
+        </a>
+      </nav>
+
+      <!-- Action Button -->
+      <div class="flex items-center gap-3">
+        <a href="https://github.com/landeploysuite/call-sharing" target="_blank" rel="noopener noreferrer"
+           class="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-[#1E293B] bg-[#070A0F] text-xs font-mono text-slate-300 hover:text-white hover:border-slate-600 transition-all">
+          <i data-lucide="github" class="w-3.5 h-3.5"></i>
+          <span>GitHub</span>
+        </a>
+
+        <a href="#download"
+           class="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-400 hover:to-cyan-400 text-black font-mono font-bold text-xs glow-emerald transition-all transform hover:scale-[1.02]">
+          <i data-lucide="download" class="w-3.5 h-3.5"></i>
+          <span>Download APK</span>
+        </a>
+      </div>
+
+    </div>
+  </header>
+
+  <!-- ===================================================================== -->
+  <!-- 2. HERO SECTION (banner.png + Live Telemetry Showcase)               -->
+  <!-- ===================================================================== -->
+  <section class="relative pt-10 pb-20 px-4 sm:px-6 overflow-hidden">
+    <!-- Ambient Radial Neon Glow in background -->
+    <div class="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[350px] bg-gradient-to-r from-emerald-500/15 via-cyan-500/15 to-emerald-500/10 blur-[130px] rounded-full pointer-events-none z-0"></div>
+
+    <div class="max-w-6xl mx-auto relative z-10 flex flex-col items-center text-center">
+      
+      <!-- Centerpiece Brand Banner -->
+      <div class="relative w-full max-w-5xl rounded-3xl overflow-hidden border border-[#152033] shadow-[0_0_80px_rgba(0,0,0,0.95)] mb-10 group">
+        <div class="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent opacity-40 z-10"></div>
+        <img src="banner.png" alt="CallShare P2P Brand Banner" class="w-full h-auto object-cover transform transition-transform duration-700 group-hover:scale-[1.01]" />
+        
+        <!-- Subtle Neon Corner Badges -->
+        <div class="absolute bottom-4 left-4 z-20 hidden sm:flex items-center gap-2">
+          <span class="px-2.5 py-1 rounded-full bg-black/80 backdrop-blur-md border border-emerald-500/40 text-emerald-400 font-mono text-[11px] flex items-center gap-1.5">
+            <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+            16,000 Hz Opus Audio
+          </span>
+          <span class="px-2.5 py-1 rounded-full bg-black/80 backdrop-blur-md border border-cyan-500/40 text-cyan-300 font-mono text-[11px]">
+            Lissajous Clamping (±10px)
+          </span>
+        </div>
+      </div>
+
+      <!-- Hero Typography -->
+      <h1 class="text-3xl sm:text-5xl md:text-6xl font-black tracking-tight text-white max-w-4xl leading-tight">
+        Zero Internet. Zero Server. <br />
+        <span class="bg-gradient-to-r from-emerald-400 via-cyan-400 to-emerald-300 bg-clip-text text-transparent text-glow-emerald">
+          Offline Cellular Call-Relay &amp; Universal AOD
+        </span>
+      </h1>
+
+      <p class="mt-5 text-sm sm:text-base md:text-lg text-slate-400 max-w-2xl font-normal leading-relaxed">
+        Bridge GSM calls from your SIM host phone to any secondary Android device over offline local Wi-Fi. Features 16kHz wideband Opus audio, 500ms DPD heartbeats, and a hardware-agnostic Always-On Display with Lissajous burn-in protection.
+      </p>
+
+      <!-- Live Status Badges Row -->
+      <div class="mt-8 flex flex-wrap items-center justify-center gap-2 sm:gap-3 text-xs font-mono">
+        <div class="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#070A0F] border border-emerald-500/40 text-emerald-300">
+          <i data-lucide="shield-check" class="w-3.5 h-3.5 text-emerald-400"></i>
+          <span>100% Rust Core (NDK)</span>
+        </div>
+        <div class="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#070A0F] border border-cyan-500/40 text-cyan-300">
+          <i data-lucide="wifi-off" class="w-3.5 h-3.5 text-cyan-400"></i>
+          <span>Zero Internet / LAN Only</span>
+        </div>
+        <div class="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#070A0F] border border-emerald-500/40 text-emerald-300">
+          <i data-lucide="zap" class="w-3.5 h-3.5 text-emerald-400"></i>
+          <span>&lt; 35ms Opus Latency</span>
+        </div>
+        <div class="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#070A0F] border border-cyan-500/40 text-cyan-300">
+          <i data-lucide="rotate-ccw" class="w-3.5 h-3.5 text-cyan-400"></i>
+          <span>Portrait &amp; Landscape Nightstand Dock</span>
+        </div>
+      </div>
+
+      <!-- Call-To-Action Buttons -->
+      <div id="download" class="mt-10 flex flex-col sm:flex-row items-center gap-4 w-full sm:w-auto">
+        <button onclick="openDownloadModal()"
+           class="w-full sm:w-auto flex items-center justify-center gap-2 px-8 py-4 rounded-2xl bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-400 hover:to-cyan-400 text-black font-mono font-bold text-sm shadow-[0_0_35px_rgba(16,185,129,0.35)] transition-all transform hover:-translate-y-0.5">
+          <i data-lucide="download" class="w-4 h-4"></i>
+          <span>Download CallShare-P2P-Debug.apk</span>
+        </button>
+
+        <a href="https://github.com/landeploysuite/call-sharing" target="_blank" rel="noopener noreferrer"
+           class="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-4 rounded-2xl bg-[#090D15] hover:bg-[#0E1524] border border-[#1E293B] hover:border-slate-600 text-slate-200 font-mono text-sm transition-all">
+          <i data-lucide="git-branch" class="w-4 h-4 text-cyan-400"></i>
+          <span>View Rust Source &amp; Cloud CI</span>
+        </a>
+      </div>
+
+      <p class="mt-3 text-[11px] font-mono text-slate-500">
+        Engineered with Zero Android Studio Build requirement via GitHub Actions Cloud CI.
+      </p>
+
+    </div>
+  </section>
+
+  <!-- ===================================================================== -->
+  <!-- 3. INTERACTIVE BENTO GRID (6 Core Capabilities)                       -->
+  <!-- ===================================================================== -->
+  <section id="features" class="py-20 px-4 sm:px-8 border-t border-[#152033]/80 bg-[#020406]">
+    <div class="max-w-7xl mx-auto">
+      
+      <!-- Section Header -->
+      <div class="text-center max-w-2xl mx-auto mb-14">
+        <span class="text-xs font-mono text-emerald-400 uppercase tracking-widest bg-emerald-500/10 px-3 py-1 rounded-full border border-emerald-500/30">
+          Architecture Highlights
+        </span>
+        <h2 class="text-3xl sm:text-4xl font-extrabold text-white mt-3 tracking-tight">
+          Surgical Systems Engineering
+        </h2>
+        <p class="text-slate-400 text-sm mt-2 font-mono">
+          Engineered across low-level Rust NDK memory pools and Android Telecom bridges.
+        </p>
+      </div>
+
+      <!-- Bento Grid (3 columns on lg, 2 on md, 1 on mobile) -->
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+
+        <!-- Card 1: 100% Rust Audio Pipeline -->
+        <div class="p-6 rounded-3xl bg-[#070A0F] border border-[#152033] hover:border-emerald-500/50 glow-card transition-all flex flex-col justify-between group">
+          <div>
+            <div class="w-12 h-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center mb-5 group-hover:scale-110 transition-transform">
+              <i data-lucide="waves" class="w-6 h-6 text-emerald-400"></i>
+            </div>
+            <span class="text-[10px] font-mono uppercase text-emerald-400 tracking-wider">rust-core/src/audio/</span>
+            <h3 class="text-lg font-bold text-white mt-1">100% Rust Audio &amp; Jitter Engine</h3>
+            <p class="text-xs text-slate-400 mt-2 leading-relaxed">
+              16,000 Hz wideband mono PCM &amp; Opus pipeline. Employs an RFC 3550 circular jitter buffer (20ms–60ms), 0.78× exponential decay Packet Loss Concealment (PLC), and 120ms VAD hangover window eliminating consonant clipping.
+            </p>
+          </div>
+
+          <!-- Live Audio Equalizer Simulation -->
+          <div class="mt-6 p-3 rounded-2xl bg-black border border-[#152033]">
+            <div class="flex items-center justify-between text-[10px] font-mono text-slate-400 mb-2">
+              <span>Opus 16kHz • VAD Active</span>
+              <span class="text-emerald-400">&lt; 24.5 ms Jitter</span>
+            </div>
+            <div class="flex items-end justify-between gap-1 h-8 px-1">
+              <div class="w-1.5 bg-emerald-400 rounded-t animate-pulse h-4"></div>
+              <div class="w-1.5 bg-cyan-400 rounded-t animate-pulse h-7"></div>
+              <div class="w-1.5 bg-emerald-400 rounded-t animate-pulse h-5"></div>
+              <div class="w-1.5 bg-cyan-400 rounded-t animate-pulse h-8"></div>
+              <div class="w-1.5 bg-emerald-400 rounded-t animate-pulse h-3"></div>
+              <div class="w-1.5 bg-cyan-400 rounded-t animate-pulse h-6"></div>
+              <div class="w-1.5 bg-emerald-400 rounded-t animate-pulse h-5"></div>
+              <div class="w-1.5 bg-cyan-400 rounded-t animate-pulse h-7"></div>
+              <div class="w-1.5 bg-emerald-400 rounded-t animate-pulse h-4"></div>
+              <div class="w-1.5 bg-cyan-400 rounded-t animate-pulse h-6"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Card 2: Zero-Internet Wi-Fi Mesh -->
+        <div class="p-6 rounded-3xl bg-[#070A0F] border border-[#152033] hover:border-cyan-500/50 glow-card transition-all flex flex-col justify-between group">
+          <div>
+            <div class="w-12 h-12 rounded-2xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center mb-5 group-hover:scale-110 transition-transform">
+              <i data-lucide="radio" class="w-6 h-6 text-cyan-400"></i>
+            </div>
+            <span class="text-[10px] font-mono uppercase text-cyan-400 tracking-wider">rust-core/src/net/</span>
+            <h3 class="text-lg font-bold text-white mt-1">Zero-Internet Local Wi-Fi Mesh</h3>
+            <p class="text-xs text-slate-400 mt-2 leading-relaxed">
+              Direct peer-to-peer LAN sockets with UDP Multicast (239.255.255.250:45781), TCP Signaling (45782) with 500ms Dead-Peer Detection, and automatic LocalOnlyHotspot P2P fallback when AP isolation is enabled.
+            </p>
+          </div>
+
+          <!-- Socket Matrix Info -->
+          <div class="mt-6 grid grid-cols-3 gap-1.5 text-center font-mono text-[10px]">
+            <div class="p-2 rounded-xl bg-black border border-[#152033]">
+              <span class="text-slate-500 block">DISCOVERY</span>
+              <span class="text-emerald-400 font-bold">:45781</span>
+            </div>
+            <div class="p-2 rounded-xl bg-black border border-[#152033]">
+              <span class="text-slate-500 block">SIGNALING</span>
+              <span class="text-cyan-400 font-bold">:45782</span>
+            </div>
+            <div class="p-2 rounded-xl bg-black border border-[#152033]">
+              <span class="text-slate-500 block">OPUS MEDIA</span>
+              <span class="text-emerald-400 font-bold">:45783</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Card 3: Universal Software AOD -->
+        <div class="p-6 rounded-3xl bg-[#070A0F] border border-[#152033] hover:border-emerald-500/50 glow-card transition-all flex flex-col justify-between group">
+          <div>
+            <div class="w-12 h-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center mb-5 group-hover:scale-110 transition-transform">
+              <i data-lucide="smartphone" class="w-6 h-6 text-emerald-400"></i>
+            </div>
+            <span class="text-[10px] font-mono uppercase text-emerald-400 tracking-wider">android-app/ui/AodActivity.kt</span>
+            <h3 class="text-lg font-bold text-white mt-1">Universal AOD &amp; Nightstand Dock</h3>
+            <p class="text-xs text-slate-400 mt-2 leading-relaxed">
+              Hardware-agnostic #000000 AMOLED pixel shutoff with 0.01f software dimming for IPS/LCD displays. Throttled from 1 FPS ambient idle to 30 FPS RenderThread pulse upon receiving incoming cellular calls.
+            </p>
+          </div>
+
+          <div class="mt-6 p-3 rounded-2xl bg-black border border-[#152033] flex items-center justify-between font-mono text-xs">
+            <span class="text-slate-400">Sensor.TYPE_PROXIMITY</span>
+            <span class="text-emerald-400 font-bold">0.00 mW Draw</span>
+          </div>
+        </div>
+
+        <!-- Card 4: Lissajous Burn-In Pixel Shifting (Interactive Mini-Canvas) -->
+        <div class="p-6 rounded-3xl bg-[#070A0F] border border-[#152033] hover:border-cyan-500/50 glow-card transition-all flex flex-col justify-between group">
+          <div>
+            <div class="w-12 h-12 rounded-2xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center mb-5 group-hover:scale-110 transition-transform">
+              <i data-lucide="compass" class="w-6 h-6 text-cyan-400"></i>
+            </div>
+            <span class="text-[10px] font-mono uppercase text-cyan-400 tracking-wider">rust-core/src/aod/burn_in_shift.rs</span>
+            <h3 class="text-lg font-bold text-white mt-1">Lissajous Burn-In Protection</h3>
+            <p class="text-xs text-slate-400 mt-2 leading-relaxed">
+              Closed Lissajous orbit prevents OLED subpixel fatigue. Dynamically clamped between Portrait (±6px X / ±8px Y) and Landscape Nightstand (±10px X / ±5px Y).
+            </p>
+          </div>
+
+          <!-- Interactive Lissajous Orbit Visualizer -->
+          <div class="mt-5 p-3 rounded-2xl bg-black border border-[#152033]">
+            <div class="flex items-center justify-between mb-2 text-[10px] font-mono">
+              <span class="text-slate-400">Interactive Orbit Canvas</span>
+              <span id="lissajous-coords" class="text-cyan-400 font-bold">X: +0.0px | Y: +0.0px</span>
+            </div>
+            <div class="relative w-full h-24 bg-[#03060A] rounded-xl border border-slate-900 flex items-center justify-center overflow-hidden">
+              <!-- Safe Zone Bounds Box -->
+              <div id="safe-box" class="absolute border border-dashed border-emerald-500/30 rounded-lg w-32 h-16 pointer-events-none"></div>
+              <!-- Moving Pixel Dot -->
+              <div id="lissajous-dot" class="w-3 h-3 rounded-full bg-cyan-400 glow-cyan transition-transform duration-75 relative z-10"></div>
+            </div>
+            <!-- Orbit Controls -->
+            <div class="flex items-center justify-between mt-2.5 text-[10px] font-mono">
+              <button onclick="toggleLissajousOrientation()" id="btn-lissajous-orient" class="px-2 py-1 rounded bg-[#0A0E17] border border-slate-800 text-slate-300 hover:text-white">
+                Mode: Portrait (±6, ±8)
+              </button>
+              <button onclick="toggleLissajousSpeed()" id="btn-lissajous-speed" class="px-2 py-1 rounded bg-cyan-500/20 border border-cyan-500/40 text-cyan-300">
+                Speed: 20x Preview
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Card 5: Freeform Drag-and-Drop AOD Studio -->
+        <div class="p-6 rounded-3xl bg-[#070A0F] border border-[#152033] hover:border-emerald-500/50 glow-card transition-all flex flex-col justify-between group">
+          <div>
+            <div class="w-12 h-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center mb-5 group-hover:scale-110 transition-transform">
+              <i data-lucide="layout" class="w-6 h-6 text-emerald-400"></i>
+            </div>
+            <span class="text-[10px] font-mono uppercase text-emerald-400 tracking-wider">android-app/ui/DraggableAodCanvasView.kt</span>
+            <h3 class="text-lg font-bold text-white mt-1">Freeform Drag-and-Drop AOD Studio</h3>
+            <p class="text-xs text-slate-400 mt-2 leading-relaxed">
+              Freely position, scale, and snap modular widgets on an 8dp magnetic grid with safe-zone bounds. Features 4 selectable clock themes and separate Portrait/Landscape coordinate memory.
+            </p>
+          </div>
+
+          <!-- Clock Style Interactive Switcher -->
+          <div class="mt-5 p-3 rounded-2xl bg-black border border-[#152033]">
+            <div class="flex items-center justify-between text-[10px] font-mono text-slate-400 mb-2">
+              <span>Theme Switcher</span>
+              <span id="clock-theme-name" class="text-emerald-400 font-bold">Cyber-Mesh Minimal</span>
+            </div>
+            <div id="clock-preview-card" class="h-16 rounded-xl bg-[#05080E] border border-slate-800 flex items-center justify-center font-mono text-2xl font-light text-white tracking-wider">
+              12:45
+            </div>
+            <div class="grid grid-cols-4 gap-1 mt-2 text-[9px] font-mono">
+              <button onclick="setClockTheme('cyber')" class="p-1 rounded bg-emerald-500/15 border border-emerald-500/40 text-emerald-300">Cyber</button>
+              <button onclick="setClockTheme('nothing')" class="p-1 rounded bg-black border border-slate-800 text-slate-400">Nothing</button>
+              <button onclick="setClockTheme('chrono')" class="p-1 rounded bg-black border border-slate-800 text-slate-400">Chrono</button>
+              <button onclick="setClockTheme('split')" class="p-1 rounded bg-black border border-slate-800 text-slate-400">Split</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Card 6: RoleManager Telecom Companion -->
+        <div class="p-6 rounded-3xl bg-[#070A0F] border border-[#152033] hover:border-cyan-500/50 glow-card transition-all flex flex-col justify-between group">
+          <div>
+            <div class="w-12 h-12 rounded-2xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center mb-5 group-hover:scale-110 transition-transform">
+              <i data-lucide="phone-call" class="w-6 h-6 text-cyan-400"></i>
+            </div>
+            <span class="text-[10px] font-mono uppercase text-cyan-400 tracking-wider">android-app/telecom/RoleManagerHelper.kt</span>
+            <h3 class="text-lg font-bold text-white mt-1">Android Telecom RoleManager</h3>
+            <p class="text-xs text-slate-400 mt-2 leading-relaxed">
+              Integrates Android 10 to 15+ RoleManager.ROLE_DIALER and InCallService hooks. Features dual-answer Bluetooth race-condition locks that revoke remote relay if answered on a host headset.
+            </p>
+          </div>
+
+          <div class="mt-6 p-3 rounded-2xl bg-black border border-[#152033] space-y-1.5 font-mono text-[11px]">
+            <div class="flex items-center justify-between text-slate-300">
+              <span>ROLE_DIALER Status:</span>
+              <span class="text-emerald-400 font-bold flex items-center gap-1">
+                <i data-lucide="check-circle-2" class="w-3 h-3"></i> ACTIVE
+              </span>
+            </div>
+            <div class="flex items-center justify-between text-slate-300">
+              <span>Audio Routing:</span>
+              <span class="text-cyan-400 font-bold">TRANSIENT_EXCLUSIVE</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ===================================================================== -->
+  <!-- 4. INTERACTIVE P2P PACKET FLOW VISUALIZER                             -->
+  <!-- ===================================================================== -->
+  <section id="architecture" class="py-20 px-4 sm:px-8 border-t border-[#152033]/80 bg-[#000000]">
+    <div class="max-w-6xl mx-auto">
+      
+      <div class="text-center max-w-2xl mx-auto mb-12">
+        <span class="text-xs font-mono text-cyan-400 uppercase tracking-widest bg-cyan-500/10 px-3 py-1 rounded-full border border-cyan-500/30">
+          Live Mesh Protocol
+        </span>
+        <h2 class="text-3xl sm:text-4xl font-extrabold text-white mt-3 tracking-tight">
+          Interactive P2P Packet Flow Simulator
+        </h2>
+        <p class="text-slate-400 text-sm mt-2 font-mono">
+          Click the button below to simulate an incoming GSM call being intercepted on Phone 1 and bridged to Phone 2 over offline Wi-Fi.
+        </p>
+      </div>
+
+      <!-- Simulator Interactive Canvas Card -->
+      <div class="p-6 sm:p-10 rounded-3xl bg-[#06090E] border border-[#152033] shadow-2xl relative overflow-hidden">
+        
+        <!-- Controls Bar -->
+        <div class="flex flex-wrap items-center justify-between gap-4 border-b border-slate-900 pb-6 mb-8">
+          <div class="flex items-center gap-2 font-mono text-xs text-slate-400">
+            <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
+            <span>Mesh Network: Subnet 192.168.1.0/24</span>
+          </div>
+
+          <button onclick="triggerSimulatedRelay()" id="btn-simulate-call"
+                  class="px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-400 hover:to-cyan-400 text-black font-mono font-bold text-xs glow-emerald transition-all flex items-center gap-2">
+            <i data-lucide="phone-incoming" class="w-4 h-4"></i>
+            <span>Simulate Incoming GSM Call Relay</span>
+          </button>
+        </div>
+
+        <!-- 3-Node Topology Diagram -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 items-center relative">
+          
+          <!-- Node 1: Phone 1 (Host SIM) -->
+          <div class="p-5 rounded-2xl bg-black border border-slate-800 text-center flex flex-col items-center">
+            <div class="w-14 h-14 rounded-2xl bg-emerald-500/10 border border-emerald-500/40 flex items-center justify-center mb-3">
+              <i data-lucide="smartphone" class="w-7 h-7 text-emerald-400"></i>
+            </div>
+            <h4 class="font-bold text-sm text-white">Phone 1 (SIM Host)</h4>
+            <span class="text-[11px] font-mono text-slate-400 mt-0.5">IP: 192.168.1.104</span>
+            <div class="mt-3 px-3 py-1 rounded bg-[#0A0E17] border border-slate-800 text-[10px] font-mono text-emerald-400 w-full">
+              SIM 1: Jio 5G Active
+            </div>
+            <div id="host-call-status" class="mt-2 text-[10px] font-mono text-slate-500">
+              Standby / Idle
+            </div>
+          </div>
+
+          <!-- Node 2: Offline Wi-Fi Hub & Sockets -->
+          <div class="p-5 rounded-2xl bg-[#090D15] border border-cyan-500/30 text-center flex flex-col items-center relative">
+            <!-- Simulated Packet Particle -->
+            <div id="packet-particle" class="w-4 h-4 rounded-full bg-cyan-400 glow-cyan absolute top-2 left-2 opacity-0 transition-all duration-500"></div>
+
+            <div class="w-14 h-14 rounded-2xl bg-cyan-500/10 border border-cyan-500/40 flex items-center justify-center mb-3">
+              <i data-lucide="radio" class="w-7 h-7 text-cyan-400 animate-pulse"></i>
+            </div>
+            <h4 class="font-bold text-sm text-white">Local Wi-Fi Mesh</h4>
+            <span class="text-[11px] font-mono text-slate-400 mt-0.5">Direct Socket Pipeline</span>
+            
+            <div class="mt-3 space-y-1 w-full font-mono text-[10px]">
+              <div class="p-1.5 rounded bg-black border border-slate-800 text-slate-300 flex justify-between">
+                <span>Discovery:</span> <span class="text-emerald-400">UDP :45781</span>
+              </div>
+              <div class="p-1.5 rounded bg-black border border-slate-800 text-slate-300 flex justify-between">
+                <span>Signaling:</span> <span class="text-cyan-400">TCP :45782</span>
+              </div>
+              <div class="p-1.5 rounded bg-black border border-slate-800 text-slate-300 flex justify-between">
+                <span>Media Opus:</span> <span class="text-emerald-400">UDP :45783</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Node 3: Phone 2 (Remote Universal AOD) -->
+          <div id="node-phone2" class="p-5 rounded-2xl bg-black border border-slate-800 text-center flex flex-col items-center transition-all">
+            <div class="w-14 h-14 rounded-2xl bg-cyan-500/10 border border-cyan-500/40 flex items-center justify-center mb-3">
+              <i data-lucide="monitor" class="w-7 h-7 text-cyan-400"></i>
+            </div>
+            <h4 class="font-bold text-sm text-white">Phone 2 (Universal AOD)</h4>
+            <span class="text-[11px] font-mono text-slate-400 mt-0.5">IP: 192.168.1.119</span>
+            <div id="remote-aod-display" class="mt-3 px-3 py-2 rounded bg-[#0A0E17] border border-slate-800 text-[10px] font-mono text-slate-400 w-full transition-all">
+              1-FPS Ambient Idle (12:45)
+            </div>
+            <div id="remote-call-action" class="mt-2 text-[10px] font-mono text-slate-500">
+              No Incoming Relay
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Live Terminal Event Log -->
+        <div class="mt-8 p-3 rounded-2xl bg-black border border-slate-900 font-mono text-[11px]">
+          <div class="flex items-center justify-between text-slate-500 pb-1 border-b border-slate-900 mb-2">
+            <span>Mesh Packet Event Trace</span>
+            <span id="trace-status" class="text-emerald-400">LISTENING</span>
+          </div>
+          <div id="trace-log" class="text-slate-400 space-y-1 h-20 overflow-y-auto">
+            <div>[00.00s] UDP Discovery beacon broadcast on 239.255.255.250:45781</div>
+            <div>[00.50s] TCP 45782 DPD Heartbeat ACK received from 192.168.1.119 (RTT 1.4ms)</div>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ===================================================================== -->
+  <!-- 5. CLOUD APK BUILD & PYTHON TEST HARNESS TERMINAL                     -->
+  <!-- ===================================================================== -->
+  <section id="protocol" class="py-20 px-4 sm:px-8 border-t border-[#152033]/80 bg-[#020406]">
+    <div class="max-w-5xl mx-auto">
+      
+      <div class="text-center max-w-2xl mx-auto mb-12">
+        <span class="text-xs font-mono text-emerald-400 uppercase tracking-widest bg-emerald-500/10 px-3 py-1 rounded-full border border-emerald-500/30">
+          Zero Android Studio Required
+        </span>
+        <h2 class="text-3xl sm:text-4xl font-extrabold text-white mt-3 tracking-tight">
+          Cloud Build &amp; Protocol Test Harness
+        </h2>
+        <p class="text-slate-400 text-sm mt-2 font-mono">
+          Build the APK in the cloud with GitHub Actions or run PC-based Wi-Fi packet tests with the included Python harness.
+        </p>
+      </div>
+
+      <!-- Tabbed Code Terminal Card -->
+      <div class="rounded-3xl bg-[#070A0F] border border-[#152033] shadow-2xl overflow-hidden">
+        
+        <!-- Terminal Header & Tabs -->
+        <div class="px-6 py-4 border-b border-slate-800 bg-[#0A0E17] flex flex-wrap items-center justify-between gap-3">
+          <div class="flex items-center gap-2">
+            <div class="w-3 h-3 rounded-full bg-red-500/80"></div>
+            <div class="w-3 h-3 rounded-full bg-amber-500/80"></div>
+            <div class="w-3 h-3 rounded-full bg-emerald-500/80"></div>
+            <span class="ml-2 text-xs font-mono text-slate-400">bash / powershell</span>
+          </div>
+
+          <div class="flex items-center gap-1.5 font-mono text-xs">
+            <button onclick="switchTerminalTab('tab-github')" id="btn-tab-github" class="px-3 py-1.5 rounded-lg bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+              1. Cloud GitHub Actions Build
+            </button>
+            <button onclick="switchTerminalTab('tab-python')" id="btn-tab-python" class="px-3 py-1.5 rounded-lg bg-black text-slate-400 hover:text-white border border-slate-800">
+              2. Python Protocol Test Harness
+            </button>
+          </div>
+        </div>
+
+        <!-- Tab 1: GitHub Actions Cloud Build -->
+        <div id="tab-github" class="p-6 font-mono text-xs leading-relaxed text-slate-300 relative group">
+          <button onclick="copyCode('code-github')" class="absolute top-4 right-4 px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] flex items-center gap-1 transition-all">
+            <i data-lucide="copy" class="w-3 h-3"></i>
+            <span id="copy-text-github">Copy</span>
+          </button>
+          <pre id="code-github" class="overflow-x-auto text-emerald-400/90 whitespace-pre">
+<span class="text-slate-500"># Step 1: Push latest commits to trigger GitHub Actions cloud compilation</span>
+git add .
+git commit -m "feat: trigger cloud APK build"
+git push origin main
+
+<span class="text-slate-500"># Step 2: Cloud CI Workflow runs cargo-ndk + gradle assembleDebug automatically</span>
+<span class="text-slate-500"># Workflow file: .github/workflows/build-apk.yml</span>
+<span class="text-cyan-400">Workflow URL:</span> https://github.com/landeploysuite/call-sharing/actions
+
+<span class="text-slate-500"># Step 3: Download APK directly from the latest Run Artifacts:</span>
+<span class="text-emerald-300">Artifact:</span> app-debug.apk (Installs on any Android 8.0+ / API 26-34 phone)
+</pre>
+        </div>
+
+        <!-- Tab 2: Python Test Harness -->
+        <div id="tab-python" class="p-6 font-mono text-xs leading-relaxed text-slate-300 relative group hidden">
+          <button onclick="copyCode('code-python')" class="absolute top-4 right-4 px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] flex items-center gap-1 transition-all">
+            <i data-lucide="copy" class="w-3 h-3"></i>
+            <span id="copy-text-python">Copy</span>
+          </button>
+          <pre id="code-python" class="overflow-x-auto text-cyan-400/90 whitespace-pre">
+<span class="text-slate-500"># Step 1: Listen for local UDP 45781 discovery beacons from your phone</span>
+python test_harness.py --listen
+
+<span class="text-slate-500"># Step 2: Trigger simulated incoming GSM call to test AOD waking & ring pulse</span>
+python test_harness.py --send-call 192.168.1.119 --number "+91 98765 43210" --name "Work Boss"
+
+<span class="text-slate-500"># Step 3: Stream 16kHz sine-wave test audio over UDP 45783</span>
+python test_harness.py --stream-audio 192.168.1.119:45783
+</pre>
+        </div>
+
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ===================================================================== -->
+  <!-- MODAL: APK DOWNLOAD INSTRUCTIONS                                      -->
+  <!-- ===================================================================== -->
+  <div id="download-modal" class="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 hidden">
+    <div class="bg-[#0B0F17] border border-slate-800 rounded-3xl max-w-lg w-full p-6 sm:p-8 shadow-2xl relative">
+      <button onclick="closeDownloadModal()" class="absolute top-5 right-5 text-slate-400 hover:text-white">
+        <i data-lucide="x" class="w-5 h-5"></i>
+      </button>
+
+      <div class="flex items-center gap-3 mb-4">
+        <div class="w-10 h-10 rounded-xl overflow-hidden border border-emerald-500/40 glow-emerald">
+          <img src="croped.png" alt="CallShare Logo" class="w-full h-full object-cover" />
+        </div>
+        <div>
+          <h3 class="text-lg font-bold text-white">Download CallShare P2P</h3>
+          <span class="text-xs font-mono text-emerald-400">Zero Android Studio Cloud Build</span>
+        </div>
+      </div>
+
+      <p class="text-xs text-slate-400 leading-relaxed font-sans mb-5">
+        Because you compile without local Android Studio, each release is built directly in GitHub's Ubuntu runner via <code class="text-cyan-300">cargo-ndk</code> and <code class="text-cyan-300">gradle assembleDebug</code>.
+      </p>
+
+      <div class="space-y-3 font-mono text-xs">
+        <div class="p-3.5 rounded-2xl bg-black border border-slate-900 flex items-start gap-3">
+          <span class="w-6 h-6 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0 font-bold">1</span>
+          <div>
+            <span class="text-white font-bold block">Open GitHub Actions Artifacts</span>
+            <span class="text-slate-500 text-[11px]">Navigate to the latest successful build on your repository.</span>
+          </div>
+        </div>
+
+        <div class="p-3.5 rounded-2xl bg-black border border-slate-900 flex items-start gap-3">
+          <span class="w-6 h-6 rounded-full bg-cyan-500/20 text-cyan-400 flex items-center justify-center shrink-0 font-bold">2</span>
+          <div>
+            <span class="text-white font-bold block">Download "app-debug.apk"</span>
+            <span class="text-slate-500 text-[11px]">Under the "Artifacts" section at the bottom of the summary page.</span>
+          </div>
+        </div>
+
+        <div class="p-3.5 rounded-2xl bg-black border border-slate-900 flex items-start gap-3">
+          <span class="w-6 h-6 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0 font-bold">3</span>
+          <div>
+            <span class="text-white font-bold block">Install on Phone 1 &amp; Phone 2</span>
+            <span class="text-slate-500 text-[11px]">Enable Wi-Fi on both devices and tap "Set Default Caller / Companion".</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="mt-6 flex items-center gap-3">
+        <a href="https://github.com/landeploysuite/call-sharing/actions" target="_blank" rel="noopener noreferrer"
+           class="flex-1 py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-400 hover:to-cyan-400 text-black font-mono font-bold text-xs flex items-center justify-center gap-2 glow-emerald transition-all">
+          <i data-lucide="external-link" class="w-4 h-4"></i>
+          <span>Open GitHub Actions Releases</span>
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- FOOTER                                                                -->
+  <!-- ===================================================================== -->
+  <footer class="py-12 px-4 sm:px-8 border-t border-[#152033]/80 bg-[#000000] text-slate-500 font-mono text-xs">
+    <div class="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6">
+      
+      <div class="flex items-center gap-3">
+        <div class="w-7 h-7 rounded-lg overflow-hidden border border-emerald-500/30">
+          <img src="croped.png" alt="CallShare Icon" class="w-full h-full object-cover" />
+        </div>
+        <span class="text-slate-400">
+          CallShare P2P • Offline Call-Relay &amp; Universal AOD System
+        </span>
+      </div>
+
+      <div class="flex items-center gap-6">
+        <a href="https://github.com/landeploysuite/call-sharing" target="_blank" class="hover:text-emerald-400 transition-colors">Source Code</a>
+        <a href="https://github.com/landeploysuite/call-sharing/blob/main/README.md" target="_blank" class="hover:text-cyan-400 transition-colors">Architecture Docs</a>
+        <a href="https://github.com/landeploysuite/call-sharing/actions" target="_blank" class="hover:text-emerald-400 transition-colors">CI/CD Pipeline</a>
+      </div>
+
+      <div>
+        <span>Apache 2.0 / MIT Dual License • 2026</span>
+      </div>
+
+    </div>
+  </footer>
+
+  <!-- ===================================================================== -->
+  <!-- INTERACTIVE JAVASCRIPT LOGIC                                          -->
+  <!-- ===================================================================== -->
+  <script>
+    // Initialize Lucide icons
+    lucide.createIcons();
+
+    // -----------------------------------------------------------------------
+    // 1. Interactive Lissajous Orbit Engine Simulator
+    // -----------------------------------------------------------------------
+    let lissajousAngle = 0;
+    let isLandscapeLissajous = false;
+    let isFastLissajous = true;
+
+    function runLissajousLoop() {
+      const maxX = isLandscapeLissajous ? 10 : 6;
+      const maxY = isLandscapeLissajous ? 5 : 8;
+      const step = isFastLissajous ? 0.08 : 0.015;
+
+      lissajousAngle = (lissajousAngle + step) % (Math.PI * 2);
+
+      const rawX = Math.sin(lissajousAngle * 3) * maxX;
+      const rawY = Math.sin(lissajousAngle * 2 + Math.PI / 4) * maxY;
+
+      const clampedX = Math.max(-maxX, Math.min(maxX, Number(rawX.toFixed(1))));
+      const clampedY = Math.max(-maxY, Math.min(maxY, Number(rawY.toFixed(1))));
+
+      // Update Dot on Canvas
+      const dot = document.getElementById('lissajous-dot');
+      if (dot) {
+        dot.style.transform = `translate(${clampedX * 5}px, ${clampedY * 3}px)`;
+      }
+
+      // Update text readout
+      const coords = document.getElementById('lissajous-coords');
+      if (coords) {
+        coords.innerText = `X: ${clampedX >= 0 ? '+' : ''}${clampedX}px | Y: ${clampedY >= 0 ? '+' : ''}${clampedY}px`;
+      }
+
+      requestAnimationFrame(runLissajousLoop);
+    }
+    requestAnimationFrame(runLissajousLoop);
+
+    function toggleLissajousOrientation() {
+      isLandscapeLissajous = !isLandscapeLissajous;
+      const btn = document.getElementById('btn-lissajous-orient');
+      const box = document.getElementById('safe-box');
+      if (isLandscapeLissajous) {
+        btn.innerText = 'Mode: Landscape (±10, ±5)';
+        btn.className = 'px-2 py-1 rounded bg-cyan-500/20 border border-cyan-500/40 text-cyan-300';
+        box.style.width = '140px';
+        box.style.height = '50px';
+      } else {
+        btn.innerText = 'Mode: Portrait (±6, ±8)';
+        btn.className = 'px-2 py-1 rounded bg-[#0A0E17] border border-slate-800 text-slate-300';
+        box.style.width = '110px';
+        box.style.height = '70px';
+      }
+    }
+
+    function toggleLissajousSpeed() {
+      isFastLissajous = !isFastLissajous;
+      const btn = document.getElementById('btn-lissajous-speed');
+      if (isFastLissajous) {
+        btn.innerText = 'Speed: 20x Preview';
+        btn.className = 'px-2 py-1 rounded bg-cyan-500/20 border border-cyan-500/40 text-cyan-300';
+      } else {
+        btn.innerText = 'Speed: 1x (60s Real-time)';
+        btn.className = 'px-2 py-1 rounded bg-slate-900 border border-slate-800 text-slate-400';
+      }
+    }
+
+    // -----------------------------------------------------------------------
+    // 2. Interactive Bento Clock Theme Switcher
+    // -----------------------------------------------------------------------
+    const clockThemes = {
+      cyber: { name: 'Cyber-Mesh Minimal', text: '12:45', class: 'font-mono text-3xl font-extralight text-white' },
+      nothing: { name: 'Nothing-OS Dot Matrix', text: '12:45 ●', class: 'font-mono text-3xl font-black text-slate-100 tracking-widest' },
+      chrono: { name: 'Analog Chrono-Ring', text: '◷ 12:45:00', class: 'font-mono text-2xl font-normal text-cyan-400' },
+      split: { name: 'Split-Flap Nightstand', text: '[ 12 | 45 ]', class: 'font-mono text-3xl font-bold text-emerald-400 tracking-tight' }
+    };
+
+    function setClockTheme(themeKey) {
+      const theme = clockThemes[themeKey];
+      if (!theme) return;
+      document.getElementById('clock-theme-name').innerText = theme.name;
+      const card = document.getElementById('clock-preview-card');
+      card.className = `h-16 rounded-xl bg-[#05080E] border border-slate-800 flex items-center justify-center ${theme.class}`;
+      card.innerText = theme.text;
+    }
+
+    // -----------------------------------------------------------------------
+    // 3. Simulated Packet Relay Flow
+    // -----------------------------------------------------------------------
+    let isSimulating = false;
+
+    function triggerSimulatedRelay() {
+      if (isSimulating) return;
+      isSimulating = true;
+
+      const hostStatus = document.getElementById('host-call-status');
+      const remoteDisplay = document.getElementById('remote-aod-display');
+      const remoteAction = document.getElementById('remote-call-action');
+      const traceLog = document.getElementById('trace-log');
+      const particle = document.getElementById('packet-particle');
+      const nodePhone2 = document.getElementById('node-phone2');
+
+      hostStatus.innerText = 'STATE_RINGING (Work Boss)';
+      hostStatus.className = 'mt-2 text-[10px] font-mono text-emerald-400 font-bold animate-pulse';
+
+      addTraceLog('[01.10s] GSM InCallService triggered STATE_RINGING for +91 98765 43210');
+      
+      // Animate particle across nodes
+      particle.style.opacity = '1';
+      particle.style.transform = 'translateX(50px)';
+
+      setTimeout(() => {
+        addTraceLog('[01.25s] TCP 45782 CallIncoming payload dispatched to Phone 2');
+        particle.style.transform = 'translateX(150px)';
+
+        // Wake Phone 2 AOD
+        remoteDisplay.innerText = 'RINGING: Work Boss (+91 98765 43210)';
+        remoteDisplay.className = 'mt-3 px-3 py-2 rounded bg-emerald-950/40 border border-emerald-400 text-[10px] font-mono text-emerald-300 font-bold animate-pulse';
+        remoteAction.innerHTML = '<span class="text-emerald-400 font-bold">Auto-Woke AOD (30 FPS Pulse)</span>';
+        nodePhone2.className = 'p-5 rounded-2xl bg-[#06110D] border border-emerald-500/60 shadow-[0_0_30px_rgba(16,185,129,0.3)] text-center flex flex-col items-center transition-all';
+      }, 700);
+
+      setTimeout(() => {
+        addTraceLog('[01.80s] UDP 45783 Opus wideband voice session established (<28ms latency)');
+        particle.style.opacity = '0';
+        particle.style.transform = 'translateX(0px)';
+        isSimulating = false;
+      }, 2000);
+    }
+
+    function addTraceLog(msg) {
+      const traceLog = document.getElementById('trace-log');
+      const line = document.createElement('div');
+      line.innerText = msg;
+      traceLog.appendChild(line);
+      traceLog.scrollTop = traceLog.scrollHeight;
+    }
+
+    // -----------------------------------------------------------------------
+    // 4. Code Terminal Tabs & Copy Logic
+    // -----------------------------------------------------------------------
+    function switchTerminalTab(tabId) {
+      document.getElementById('tab-github').classList.add('hidden');
+      document.getElementById('tab-python').classList.add('hidden');
+      document.getElementById('btn-tab-github').className = 'px-3 py-1.5 rounded-lg bg-black text-slate-400 hover:text-white border border-slate-800';
+      document.getElementById('btn-tab-python').className = 'px-3 py-1.5 rounded-lg bg-black text-slate-400 hover:text-white border border-slate-800';
+
+      document.getElementById(tabId).classList.remove('hidden');
+      if (tabId === 'tab-github') {
+        document.getElementById('btn-tab-github').className = 'px-3 py-1.5 rounded-lg bg-emerald-500/20 text-emerald-300 border border-emerald-500/40';
+      } else {
+        document.getElementById('btn-tab-python').className = 'px-3 py-1.5 rounded-lg bg-cyan-500/20 text-cyan-300 border border-cyan-500/40';
+      }
+    }
+
+    function copyCode(codeElementId) {
+      const text = document.getElementById(codeElementId).innerText;
+      navigator.clipboard.writeText(text);
+      const isGithub = codeElementId === 'code-github';
+      const label = document.getElementById(isGithub ? 'copy-text-github' : 'copy-text-python');
+      label.innerText = 'Copied!';
+      setTimeout(() => {
+        label.innerText = 'Copy';
+      }, 2000);
+    }
+
+    // -----------------------------------------------------------------------
+    // 5. Download Modal Controls
+    // -----------------------------------------------------------------------
+    function openDownloadModal() {
+      document.getElementById('download-modal').classList.remove('hidden');
+    }
+    function closeDownloadModal() {
+      document.getElementById('download-modal').classList.add('hidden');
+    }
+  </script>
+
+</body>
+</html>

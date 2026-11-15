@@ -13,6 +13,16 @@
         android:orientation="vertical"
         android:padding="24dp">
 
+        <!-- Brand Watermark Logo -->
+        <ImageView
+            android:id="@+id/iv_aod_logo"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:layout_marginBottom="8dp"
+            android:alpha="0.85"
+            android:src="@drawable/croped"
+            android:contentDescription="CallShare AOD Logo" />
+
         <!-- Minimalist Ambient Clock (1 FPS) -->
         <TextView
             android:id="@+id/text_aod_clock"

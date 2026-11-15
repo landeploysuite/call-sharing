@@ -19,13 +19,43 @@
             android:layout_marginEnd="16dp"
             android:orientation="vertical">
 
-            <TextView
-                android:layout_width="wrap_content"
+            <!-- Brand Header Bar with Official Logo -->
+            <LinearLayout
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="@string/dashboard_title"
-                android:textColor="@color/aod_accent_cyan"
-                android:textSize="22sp"
-                android:textStyle="bold" />
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <ImageView
+                    android:id="@+id/iv_app_logo"
+                    android:layout_width="38dp"
+                    android:layout_height="38dp"
+                    android:layout_marginEnd="10dp"
+                    android:src="@drawable/croped"
+                    android:contentDescription="CallShare P2P Brand Logo" />
+
+                <LinearLayout
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/dashboard_title"
+                        android:textColor="@color/aod_accent_cyan"
+                        android:textSize="20sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:fontFamily="monospace"
+                        android:text="Offline LAN Telephony • Universal AOD"
+                        android:textColor="@color/text_telemetry_muted"
+                        android:textSize="9sp" />
+                </LinearLayout>
+            </LinearLayout>
 
             <TextView
                 android:id="@+id/text_local_info"
