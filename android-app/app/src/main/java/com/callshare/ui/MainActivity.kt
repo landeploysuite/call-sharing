@@ -29,6 +29,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var btnLaunchAod: Button
     private lateinit var btnSetDefaultDialer: Button
     private lateinit var btnSimulateIncomingCall: Button
+    private lateinit var btnOpenSettings: Button
 
     private val permissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -58,6 +59,12 @@ class MainActivity : AppCompatActivity() {
         btnLaunchAod = findViewById(R.id.btn_launch_aod)
         btnSetDefaultDialer = findViewById(R.id.btn_set_default_dialer)
         btnSimulateIncomingCall = findViewById(R.id.btn_simulate_call)
+        btnOpenSettings = findViewById(R.id.btn_open_settings)
+
+        btnOpenSettings.setOnClickListener {
+            val intent = Intent(this, SettingsActivity::class.java)
+            startActivity(intent)
+        }
 
         btnRefreshPeers.setOnClickListener {
             CallShareApp.instance.initRustNativeCore()
@@ -157,11 +164,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun requestInCallCompanionRole() {
-        val intent = RoleManagerHelper.createDefaultDialerIntent(this)
-        if (intent != null) {
-            startActivity(intent)
-        } else {
-            Toast.makeText(this, "CallShare is already the default dialer!", Toast.LENGTH_SHORT).show()
+        RoleManagerHelper.showPrePermissionConfigSheet(this) {
+            updateRoleButtonState()
         }
     }
 }

@@ -4,6 +4,7 @@ import android.animation.ObjectAnimator
 import android.animation.ValueAnimator
 import android.content.Context
 import android.content.Intent
+import android.content.pm.ActivityInfo
 import android.content.res.Configuration
 import android.hardware.Sensor
 import android.hardware.SensorEvent
@@ -135,8 +136,10 @@ class AodActivity : AppCompatActivity(), SensorEventListener {
             WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON
         )
 
+        val prefs = getSharedPreferences("callshare_settings_prefs", Context.MODE_PRIVATE)
+        val dimmingProgress = prefs.getInt("pref_screen_dimming", 1)
         val lp = window.attributes
-        lp.screenBrightness = 0.01f
+        lp.screenBrightness = (dimmingProgress / 100f).coerceIn(0.01f, 0.20f)
         window.attributes = lp
 
         window.decorView.systemUiVisibility = (
@@ -174,8 +177,17 @@ class AodActivity : AppCompatActivity(), SensorEventListener {
 
     override fun onResume() {
         super.onResume()
-        proximitySensor?.let {
-            sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_NORMAL)
+        val prefs = getSharedPreferences("callshare_settings_prefs", Context.MODE_PRIVATE)
+        if (prefs.getBoolean("pref_proximity_gate", true)) {
+            proximitySensor?.let {
+                sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_NORMAL)
+            }
+        }
+        val orientMode = prefs.getInt("pref_aod_orientation_lock", 0)
+        when (orientMode) {
+            1 -> requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+            2 -> requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR
+            else -> requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
         }
     }
 
@@ -277,8 +289,10 @@ class AodActivity : AppCompatActivity(), SensorEventListener {
         pulseAnimator?.cancel()
         pulseAnimator = null
 
+        val prefs = getSharedPreferences("callshare_settings_prefs", Context.MODE_PRIVATE)
+        val dimmingProgress = prefs.getInt("pref_screen_dimming", 1)
         val lp = window.attributes
-        lp.screenBrightness = 0.01f
+        lp.screenBrightness = (dimmingProgress / 100f).coerceIn(0.01f, 0.20f)
         window.attributes = lp
     }
 

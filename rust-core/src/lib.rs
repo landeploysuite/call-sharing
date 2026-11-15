@@ -11,7 +11,7 @@ use std::net::SocketAddr;
 use std::sync::{Arc, OnceLock};
 use jni::JNIEnv;
 use jni::objects::{JClass, JString, JByteArray, JByteBuffer};
-use jni::sys::{jboolean, jint, jstring, jshortArray, jintArray};
+use jni::sys::{jboolean, jint, jfloat, jstring, jshortArray, jintArray};
 use parking_lot::Mutex;
 use tokio::runtime::Runtime;
 use log::{info, warn, error};
@@ -374,6 +374,34 @@ pub extern "system" fn Java_com_callshare_native_NativeBridge_setDeviceOrientati
     };
     core.burn_in_engine.lock().set_orientation(orient);
     core.sensor_governor.lock().set_orientation(orient);
+}
+
+#[no_mangle]
+pub extern "system" fn Java_com_callshare_native_NativeBridge_setAodOrientation(
+    _env: JNIEnv,
+    _class: JClass,
+    mode: jint,
+) {
+    let core = get_core();
+    core.burn_in_engine.lock().set_aod_orientation(mode as i32);
+}
+
+#[no_mangle]
+pub extern "system" fn Java_com_callshare_native_NativeBridge_setOrbitSpeedMultiplier(
+    _env: JNIEnv,
+    _class: JClass,
+    multiplier: jfloat,
+) {
+    let core = get_core();
+    core.burn_in_engine.lock().set_orbit_speed_multiplier(multiplier as f32);
+}
+
+#[no_mangle]
+pub extern "system" fn Java_com_callshare_native_NativeBridge_getBurnInOffset(
+    env: JNIEnv,
+    class: JClass,
+) -> jintArray {
+    Java_com_callshare_native_NativeBridge_getAodShiftOffset(env, class)
 }
 
 #[no_mangle]

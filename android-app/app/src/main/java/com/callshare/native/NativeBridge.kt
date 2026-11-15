@@ -107,6 +107,28 @@ object NativeBridge {
         }
     }
 
+    fun safeGetBurnInOffset(): IntArray {
+        return safeGetAodShiftOffset()
+    }
+
+    fun safeSetAodOrientation(mode: Int) {
+        if (!isLoaded) return
+        try {
+            setAodOrientation(mode)
+        } catch (e: Throwable) {
+            Log.e(TAG, "Error in setAodOrientation: ${e.message}")
+        }
+    }
+
+    fun safeSetOrbitSpeedMultiplier(multiplier: Float) {
+        if (!isLoaded) return
+        try {
+            setOrbitSpeedMultiplier(multiplier)
+        } catch (e: Throwable) {
+            Log.e(TAG, "Error in setOrbitSpeedMultiplier: ${e.message}")
+        }
+    }
+
     fun safeIsApIsolated(): Boolean {
         if (!isLoaded) return false
         return try {
@@ -147,7 +169,10 @@ object NativeBridge {
 
     @JvmStatic external fun onSensorStateChanged(isNear: Boolean)
     @JvmStatic external fun setDeviceOrientation(orientation: Int)
+    @JvmStatic external fun setAodOrientation(mode: Int)
+    @JvmStatic external fun setOrbitSpeedMultiplier(multiplier: Float)
     @JvmStatic external fun getAodShiftOffset(): IntArray
+    @JvmStatic external fun getBurnInOffset(): IntArray
 
     // Bug 2.2: Zero-allocation direct ByteBuffer memory transfers
     @JvmStatic external fun pullPlaybackPcmDirect(directBuffer: ByteBuffer, samplesCount: Int): Int

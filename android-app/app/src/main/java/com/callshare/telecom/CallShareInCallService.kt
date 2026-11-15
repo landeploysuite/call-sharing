@@ -63,8 +63,12 @@ class CallShareInCallService : InCallService() {
                 Log.d(TAG, "Call state changed: $state")
                 when (state) {
                     Call.STATE_RINGING -> {
-                        NativeBridge.notifyLocalCallRinging(sessionId, callerNumber, callerName, 0)
-                        launchAodCallOverlay(sessionId, callerNumber, callerName)
+                        if (RoleManagerHelper.isRelayGsmOverLanEnabled(applicationContext)) {
+                            NativeBridge.notifyLocalCallRinging(sessionId, callerNumber, callerName, 0)
+                        }
+                        if (RoleManagerHelper.isAutoWakeAodEnabled(applicationContext)) {
+                            launchAodCallOverlay(sessionId, callerNumber, callerName)
+                        }
                     }
                     Call.STATE_ACTIVE -> {
                         // Bug 2.1: Detect if answered directly on host via Bluetooth headset
@@ -92,8 +96,12 @@ class CallShareInCallService : InCallService() {
         })
 
         if (call.state == Call.STATE_RINGING) {
-            NativeBridge.notifyLocalCallRinging(sessionId, callerNumber, callerName, 0)
-            launchAodCallOverlay(sessionId, callerNumber, callerName)
+            if (RoleManagerHelper.isRelayGsmOverLanEnabled(applicationContext)) {
+                NativeBridge.notifyLocalCallRinging(sessionId, callerNumber, callerName, 0)
+            }
+            if (RoleManagerHelper.isAutoWakeAodEnabled(applicationContext)) {
+                launchAodCallOverlay(sessionId, callerNumber, callerName)
+            }
         }
     }
 

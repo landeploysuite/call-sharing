@@ -1,0 +1,382 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/black"
+    android:fillViewport="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="20dp">
+
+        <!-- Top Header -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:fontFamily="sans-serif-medium"
+                android:text="Settings &amp; AOD Studio"
+                android:textColor="@color/white"
+                android:textSize="20sp" />
+
+            <Button
+                android:id="@+id/btn_launch_aod_studio"
+                android:layout_width="wrap_content"
+                android:layout_height="38dp"
+                android:backgroundTint="@color/emerald_active"
+                android:fontFamily="monospace"
+                android:paddingStart="14dp"
+                android:paddingEnd="14dp"
+                android:text="Open Canvas Studio"
+                android:textColor="@color/black"
+                android:textSize="11sp" />
+        </LinearLayout>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:fontFamily="monospace"
+            android:text="Offline LAN Telephony • Anti-Burn-In • Asset Customizer"
+            android:textColor="@color/text_telemetry_muted"
+            android:textSize="11sp" />
+
+        <!-- ============================================================= -->
+        <!-- SECTION 1: ROLEMANAGER DEFAULT CALLER & COMPANION             -->
+        <!-- ============================================================= -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:fontFamily="monospace"
+            android:text="1. TELECOM ROLE &amp; LAN RELAY"
+            android:textColor="@color/cyan_opus_mesh"
+            android:textSize="11sp" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:background="@drawable/card_obsidian_background"
+            android:orientation="vertical"
+            android:padding="16dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:fontFamily="sans-serif-medium"
+                        android:text="RoleManager.ROLE_DIALER"
+                        android:textColor="@color/white"
+                        android:textSize="14sp" />
+
+                    <TextView
+                        android:id="@+id/tv_role_badge"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="2dp"
+                        android:fontFamily="monospace"
+                        android:text="Checking role status..."
+                        android:textColor="@color/amber_jitter_warn"
+                        android:textSize="11sp" />
+                </LinearLayout>
+
+                <Button
+                    android:id="@+id/btn_configure_role"
+                    android:layout_width="wrap_content"
+                    android:layout_height="36dp"
+                    android:backgroundTint="#1F293D"
+                    android:fontFamily="monospace"
+                    android:text="Configure Sheet"
+                    android:textColor="@color/emerald_active"
+                    android:textSize="10sp" />
+            </LinearLayout>
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="Allows CallShare to intercept cellular calls, relay PCM voice streams over local Wi-Fi, and wake AOD automatically."
+                android:textColor="@color/text_secondary"
+                android:textSize="11sp" />
+        </LinearLayout>
+
+        <!-- ============================================================= -->
+        <!-- SECTION 2: 3-WAY AOD ORIENTATION LOCK                         -->
+        <!-- ============================================================= -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:fontFamily="monospace"
+            android:text="2. AOD ORIENTATION LOCK &amp; AUTO-DOCK"
+            android:textColor="@color/cyan_opus_mesh"
+            android:textSize="11sp" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:background="@drawable/card_obsidian_background"
+            android:orientation="vertical"
+            android:padding="16dp">
+
+            <RadioGroup
+                android:id="@+id/rg_orientation_lock"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <RadioButton
+                    android:id="@+id/rb_portrait_lock"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:buttonTint="@color/emerald_active"
+                    android:text="Portrait Lock (Lissajous: ±6px X / ±8px Y)"
+                    android:textColor="@color/white"
+                    android:textSize="13sp" />
+
+                <RadioButton
+                    android:id="@+id/rb_landscape_dock"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:buttonTint="@color/emerald_active"
+                    android:text="Landscape Nightstand Dock (Lissajous: ±10px X / ±5px Y)"
+                    android:textColor="@color/white"
+                    android:textSize="13sp" />
+
+                <RadioButton
+                    android:id="@+id/rb_auto_sensor"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:buttonTint="@color/emerald_active"
+                    android:text="Auto-Rotate (Sensor Gate Adaptive Clamping)"
+                    android:textColor="@color/white"
+                    android:textSize="13sp" />
+            </RadioGroup>
+        </LinearLayout>
+
+        <!-- ============================================================= -->
+        <!-- SECTION 3: 4 SELECTABLE CLOCK PRESETS                         -->
+        <!-- ============================================================= -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:fontFamily="monospace"
+            android:text="3. AOD CLOCK THEME PRESETS"
+            android:textColor="@color/cyan_opus_mesh"
+            android:textSize="11sp" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:background="@drawable/card_obsidian_background"
+            android:orientation="vertical"
+            android:padding="16dp">
+
+            <RadioGroup
+                android:id="@+id/rg_clock_style"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <RadioButton
+                    android:id="@+id/rb_cyber_minimal"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:buttonTint="@color/emerald_active"
+                    android:text="Cyber-Mesh Minimal (Monospace thin + live UDP ping ticker)"
+                    android:textColor="@color/white"
+                    android:textSize="13sp" />
+
+                <RadioButton
+                    android:id="@+id/rb_nothing_matrix"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:buttonTint="@color/emerald_active"
+                    android:text="Nothing-OS Dot Matrix (Industrial dots + red signature accent)"
+                    android:textColor="@color/white"
+                    android:textSize="13sp" />
+
+                <RadioButton
+                    android:id="@+id/rb_analog_chrono"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:buttonTint="@color/emerald_active"
+                    android:text="Analog Chrono-Ring (Radial dial + battery &amp; jitter arcs)"
+                    android:textColor="@color/white"
+                    android:textSize="13sp" />
+
+                <RadioButton
+                    android:id="@+id/rb_split_flap"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:buttonTint="@color/emerald_active"
+                    android:text="Split-Flap Nightstand (High-contrast bedside flip clock)"
+                    android:textColor="@color/white"
+                    android:textSize="13sp" />
+            </RadioGroup>
+        </LinearLayout>
+
+        <!-- ============================================================= -->
+        <!-- SECTION 4: AMOLED HARDWARE GATES & ORBIT SPEED                -->
+        <!-- ============================================================= -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:fontFamily="monospace"
+            android:text="4. AMOLED BRIGHTNESS &amp; HARDWARE GATES"
+            android:textColor="@color/cyan_opus_mesh"
+            android:textSize="11sp" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:background="@drawable/card_obsidian_background"
+            android:orientation="vertical"
+            android:padding="16dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="Software Dimming Fallback"
+                    android:textColor="@color/white"
+                    android:textSize="13sp" />
+
+                <TextView
+                    android:id="@+id/tv_dimming_value"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="monospace"
+                    android:text="0.01f"
+                    android:textColor="@color/emerald_active"
+                    android:textSize="12sp" />
+            </LinearLayout>
+
+            <SeekBar
+                android:id="@+id/seekbar_dimming"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:max="20"
+                android:progress="1"
+                android:progressTint="@color/emerald_active"
+                android:thumbTint="@color/emerald_active" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="0.01f (True OLED Pitch Black) to 0.20f (IPS / LCD Backlight Fallback)"
+                android:textColor="@color/text_secondary"
+                android:textSize="10sp" />
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:layout_marginTop="12dp"
+                android:layout_marginBottom="12dp"
+                android:background="#152033" />
+
+            <androidx.appcompat.widget.SwitchCompat
+                android:id="@+id/switch_proximity_gate"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Proximity Sensor Pocket Blanking (sensor_gate.rs)"
+                android:textColor="@color/white"
+                android:textSize="13sp"
+                app:thumbTint="@color/emerald_active"
+                app:trackTint="#044E36" />
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:layout_marginTop="12dp"
+                android:layout_marginBottom="12dp"
+                android:background="#152033" />
+
+            <androidx.appcompat.widget.SwitchCompat
+                android:id="@+id/switch_orbit_preview"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="20x Lissajous Orbit Fast-Forward Preview"
+                android:textColor="@color/white"
+                android:textSize="13sp"
+                app:thumbTint="@color/cyan_opus_mesh"
+                app:trackTint="#083344" />
+        </LinearLayout>
+
+        <!-- ============================================================= -->
+        <!-- SECTION 5: CUSTOM STICKER PHOTO PICKER                        -->
+        <!-- ============================================================= -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:fontFamily="monospace"
+            android:text="5. CUSTOM ASSET &amp; STICKER INJECTION"
+            android:textColor="@color/cyan_opus_mesh"
+            android:textSize="11sp" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:background="@drawable/card_obsidian_background"
+            android:orientation="vertical"
+            android:padding="16dp">
+
+            <Button
+                android:id="@+id/btn_import_sticker"
+                android:layout_width="match_parent"
+                android:layout_height="44dp"
+                android:backgroundTint="#0C1322"
+                android:fontFamily="monospace"
+                android:text="+ Import Custom Transparent PNG / WebP Sticker"
+                android:textColor="@color/cyan_opus_mesh"
+                android:textSize="11sp" />
+
+            <Button
+                android:id="@+id/btn_reset_aod_layout"
+                android:layout_width="match_parent"
+                android:layout_height="40dp"
+                android:layout_marginTop="8dp"
+                android:backgroundTint="#0C1322"
+                android:fontFamily="monospace"
+                android:text="Reset AOD Coordinates to Factory Profile"
+                android:textColor="@color/text_secondary"
+                android:textSize="11sp" />
+        </LinearLayout>
+
+    </LinearLayout>
+</ScrollView>

@@ -61,6 +61,12 @@
             android:turnScreenOn="true"
             android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize" />
 
+        <!-- Settings & AOD Customization Studio Activity -->
+        <activity
+            android:name=".ui.SettingsActivity"
+            android:exported="false"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize" />
+
         <!-- Android Telecom InCallService Companion -->
         <service
             android:name=".telecom.CallShareInCallService"
