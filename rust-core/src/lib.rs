@@ -1,3 +1,5 @@
+#![allow(unused_mut)]
+
 //! CallShare Core Native JNI Runtime
 //! Orchestrates Audio Engine, Local LAN Networking, State Machine, and Universal AOD.
 //! Implements direct ByteBuffer memory exchange (Bug 2.2), DPD Heartbeat Watchdog (Bug 1.3),
@@ -170,7 +172,7 @@ fn dispatch_java_call_revoked(session_id: &str, reason: &str) {
 
 #[no_mangle]
 pub extern "system" fn Java_com_callshare_native_NativeBridge_initNativeCore(
-    env: JNIEnv,
+    mut env: JNIEnv,
     _class: JClass,
     device_id: JString,
     device_name: JString,
@@ -296,7 +298,7 @@ pub extern "system" fn Java_com_callshare_native_NativeBridge_initNativeCore(
 
 #[no_mangle]
 pub extern "system" fn Java_com_callshare_native_NativeBridge_startDiscovery(
-    _env: JNIEnv,
+    mut _env: JNIEnv,
     _class: JClass,
 ) {
     if let Some(core) = get_core() {
@@ -311,7 +313,7 @@ pub extern "system" fn Java_com_callshare_native_NativeBridge_startDiscovery(
 
 #[no_mangle]
 pub extern "system" fn Java_com_callshare_native_NativeBridge_stopDiscovery(
-    _env: JNIEnv,
+    mut _env: JNIEnv,
     _class: JClass,
 ) {
     if let Some(core) = get_core() {
@@ -324,7 +326,7 @@ pub extern "system" fn Java_com_callshare_native_NativeBridge_stopDiscovery(
 
 #[no_mangle]
 pub extern "system" fn Java_com_callshare_native_NativeBridge_isApIsolated(
-    _env: JNIEnv,
+    mut _env: JNIEnv,
     _class: JClass,
 ) -> jboolean {
     match get_core() {
@@ -354,7 +356,7 @@ pub extern "system" fn Java_com_callshare_native_NativeBridge_getDiscoveredPeers
 
 #[no_mangle]
 pub extern "system" fn Java_com_callshare_native_NativeBridge_connectToPeer(
-    env: JNIEnv,
+    mut env: JNIEnv,
     _class: JClass,
     peer_ip: JString,
     signaling_port: jint,
@@ -382,7 +384,7 @@ pub extern "system" fn Java_com_callshare_native_NativeBridge_connectToPeer(
 
 #[no_mangle]
 pub extern "system" fn Java_com_callshare_native_NativeBridge_notifyLocalCallRinging(
-    env: JNIEnv,
+    mut env: JNIEnv,
     _class: JClass,
     session_id: JString,
     caller_number: JString,
@@ -421,7 +423,7 @@ pub extern "system" fn Java_com_callshare_native_NativeBridge_notifyLocalCallRin
 /// Bug 2.1: Host phone answered locally via Bluetooth; revoke remote relay
 #[no_mangle]
 pub extern "system" fn Java_com_callshare_native_NativeBridge_notifyCallAnsweredLocally(
-    env: JNIEnv,
+    mut env: JNIEnv,
     _class: JClass,
     session_id: JString,
 ) {
@@ -439,7 +441,7 @@ pub extern "system" fn Java_com_callshare_native_NativeBridge_notifyCallAnswered
 
 #[no_mangle]
 pub extern "system" fn Java_com_callshare_native_NativeBridge_answerRelayedCall(
-    env: JNIEnv,
+    mut env: JNIEnv,
     _class: JClass,
     session_id: JString,
 ) {
@@ -457,7 +459,7 @@ pub extern "system" fn Java_com_callshare_native_NativeBridge_answerRelayedCall(
 
 #[no_mangle]
 pub extern "system" fn Java_com_callshare_native_NativeBridge_rejectRelayedCall(
-    env: JNIEnv,
+    mut env: JNIEnv,
     _class: JClass,
     session_id: JString,
     reason: JString,
@@ -477,7 +479,7 @@ pub extern "system" fn Java_com_callshare_native_NativeBridge_rejectRelayedCall(
 
 #[no_mangle]
 pub extern "system" fn Java_com_callshare_native_NativeBridge_hangupCall(
-    env: JNIEnv,
+    mut env: JNIEnv,
     _class: JClass,
     session_id: JString,
     reason: JString,
@@ -498,7 +500,7 @@ pub extern "system" fn Java_com_callshare_native_NativeBridge_hangupCall(
 
 #[no_mangle]
 pub extern "system" fn Java_com_callshare_native_NativeBridge_setMicMute(
-    _env: JNIEnv,
+    mut _env: JNIEnv,
     _class: JClass,
     muted: jboolean,
 ) {
@@ -509,7 +511,7 @@ pub extern "system" fn Java_com_callshare_native_NativeBridge_setMicMute(
 
 #[no_mangle]
 pub extern "system" fn Java_com_callshare_native_NativeBridge_onSensorStateChanged(
-    _env: JNIEnv,
+    mut _env: JNIEnv,
     _class: JClass,
     is_near: jboolean,
 ) {
@@ -520,7 +522,7 @@ pub extern "system" fn Java_com_callshare_native_NativeBridge_onSensorStateChang
 
 #[no_mangle]
 pub extern "system" fn Java_com_callshare_native_NativeBridge_setDeviceOrientation(
-    _env: JNIEnv,
+    mut _env: JNIEnv,
     _class: JClass,
     orientation: jint,
 ) {
@@ -537,7 +539,7 @@ pub extern "system" fn Java_com_callshare_native_NativeBridge_setDeviceOrientati
 
 #[no_mangle]
 pub extern "system" fn Java_com_callshare_native_NativeBridge_setAodOrientation(
-    _env: JNIEnv,
+    mut _env: JNIEnv,
     _class: JClass,
     mode: jint,
 ) {
@@ -548,7 +550,7 @@ pub extern "system" fn Java_com_callshare_native_NativeBridge_setAodOrientation(
 
 #[no_mangle]
 pub extern "system" fn Java_com_callshare_native_NativeBridge_setOrbitSpeedMultiplier(
-    _env: JNIEnv,
+    mut _env: JNIEnv,
     _class: JClass,
     multiplier: jfloat,
 ) {
@@ -559,7 +561,7 @@ pub extern "system" fn Java_com_callshare_native_NativeBridge_setOrbitSpeedMulti
 
 #[no_mangle]
 pub extern "system" fn Java_com_callshare_native_NativeBridge_getBurnInOffset(
-    env: JNIEnv,
+    mut env: JNIEnv,
     class: JClass,
 ) -> jintArray {
     Java_com_callshare_native_NativeBridge_getAodShiftOffset(env, class)
@@ -590,7 +592,7 @@ pub extern "system" fn Java_com_callshare_native_NativeBridge_getAodShiftOffset(
 /// Bug 2.2: Zero-allocation direct ByteBuffer audio extraction preventing ART reference overflow
 #[no_mangle]
 pub extern "system" fn Java_com_callshare_native_NativeBridge_pullPlaybackPcmDirect(
-    env: JNIEnv,
+    mut env: JNIEnv,
     _class: JClass,
     direct_buffer: JByteBuffer,
     samples_count: jint,
@@ -621,7 +623,7 @@ pub extern "system" fn Java_com_callshare_native_NativeBridge_pullPlaybackPcmDir
 /// Bug 2.2: Zero-allocation direct ByteBuffer mic ingest
 #[no_mangle]
 pub extern "system" fn Java_com_callshare_native_NativeBridge_processMicCaptureDirect(
-    env: JNIEnv,
+    mut env: JNIEnv,
     _class: JClass,
     direct_buffer: JByteBuffer,
     bytes_count: jint,
@@ -645,7 +647,7 @@ pub extern "system" fn Java_com_callshare_native_NativeBridge_processMicCaptureD
 // Fallback legacy array APIs
 #[no_mangle]
 pub extern "system" fn Java_com_callshare_native_NativeBridge_processMicCapture(
-    env: JNIEnv,
+    mut env: JNIEnv,
     _class: JClass,
     pcm_bytes: JByteArray,
 ) {

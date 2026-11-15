@@ -67,7 +67,7 @@ impl AudioPipeline {
     }
 
     pub fn set_mic_mute(&self, muted: bool) {
-        let mut codec = self.codec.lock();
+        let codec = self.codec.lock();
         codec.set_mic_muted(muted);
     }
 
