@@ -224,7 +224,8 @@ impl DiscoveryEngine {
         socket.bind(&bind_addr.into())?;
 
         let multi_addr: Ipv4Addr = MULTICAST_IPV4.parse()?;
-        socket.join_multicast_v4(&multi_addr, &Ipv4Addr::UNSPECIFIED)?;
+        // Join multicast group defensively; if kernel lacks multicast route on offline AP, continue broadcasting
+        let _ = socket.join_multicast_v4(&multi_addr, &Ipv4Addr::UNSPECIFIED);
 
         let udp_socket = UdpSocket::from_std(socket.into())?;
         info!("Discovery listener bound to 0.0.0.0:{}", DEFAULT_DISCOVERY_PORT);

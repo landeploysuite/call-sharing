@@ -96,7 +96,7 @@ def check_jni_bindings():
             print(f"FAILED: NativeBridge.kt does not declare {cb}")
             return False
 
-    print("  ✓ All 22 JNI native methods and 4 core reverse callbacks verified.")
+    print(f"  ✓ All {len(rust_fns)} JNI native methods and {len(callbacks)} core reverse callbacks verified.")
     return True
 
 def check_cold_start_guards():

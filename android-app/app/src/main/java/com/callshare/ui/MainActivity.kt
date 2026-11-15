@@ -35,6 +35,61 @@ import org.json.JSONArray
 
 class MainActivity : AppCompatActivity() {
 
+    // Persistent On-Screen Breadcrumb Logger & Safe Mode Controller
+    object BootDiagnostics {
+        private const val PREFS = "boot_diagnostics"
+        private const val KEY_CURRENT_STEP = "current_in_progress_step"
+        private const val KEY_BOOT_COMPLETE = "boot_complete"
+
+        fun onStepStarting(context: Context, stepName: String) {
+            val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            prefs.edit()
+                .putString(KEY_CURRENT_STEP, stepName)
+                .putBoolean(KEY_BOOT_COMPLETE, false)
+                .commit() // Must be synchronous commit() to persist to disk BEFORE native/IPC invocation!
+            Log.i("BootDiagnostics", ">>> STARTING $stepName")
+        }
+
+        fun onStepCompleted(context: Context, stepName: String) {
+            val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            prefs.edit()
+                .putString(KEY_CURRENT_STEP, "$stepName [DONE]")
+                .commit()
+            Log.i("BootDiagnostics", "<<< COMPLETED $stepName")
+        }
+
+        fun onBootFinished(context: Context) {
+            val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            prefs.edit()
+                .putBoolean(KEY_BOOT_COMPLETE, true)
+                .remove(KEY_CURRENT_STEP)
+                .commit()
+            Log.i("BootDiagnostics", "=== BOOT COMPLETE ===")
+        }
+
+        fun checkPreviousCrash(context: Context): String? {
+            val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            val wasBootComplete = prefs.getBoolean(KEY_BOOT_COMPLETE, true)
+            val inProgress = prefs.getString(KEY_CURRENT_STEP, null)
+            if (!wasBootComplete && !inProgress.isNullOrBlank() && !inProgress.endsWith("[DONE]")) {
+                return inProgress
+            }
+            return null
+        }
+
+        fun clearPreviousCrash(context: Context) {
+            val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            prefs.edit()
+                .putBoolean(KEY_BOOT_COMPLETE, true)
+                .remove(KEY_CURRENT_STEP)
+                .commit()
+        }
+    }
+
+    private lateinit var textBootCheckpoint: TextView
+    private lateinit var textSafeModeWarning: TextView
+    private lateinit var btnSafeModeResume: Button
+
     private lateinit var textLocalInfo: TextView
     private lateinit var textPeersList: TextView
     private lateinit var btnRefreshPeers: Button
@@ -44,6 +99,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var btnDirectCall: Button
     private lateinit var btnCallPeerSim: Button
     private lateinit var btnOpenSettings: Button
+
+    private var isSafeModeActive = false
 
     private val permissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -86,59 +143,98 @@ class MainActivity : AppCompatActivity() {
             showStartupErrorDialog("View Binding", t)
         }
 
-        // 4. Post-Delay Subsystem Startup: Ensure UI is completely drawn and interactive FIRST
+        // 4. Log STEP 1: UI Inflated
+        BootDiagnostics.onStepStarting(this, "STEP 1: UI Inflated")
+        textBootCheckpoint.text = "Status: STEP 1: UI Inflated"
+        BootDiagnostics.onStepCompleted(this, "STEP 1: UI Inflated")
+
+        // 5. Check for Previous Boot Crash (Safe Mode Gate)
+        val crashedStep = BootDiagnostics.checkPreviousCrash(this)
+        if (crashedStep != null) {
+            isSafeModeActive = true
+            Log.w("MainActivity", "Previous launch died at step: $crashedStep. Halting auto-boot in Safe Mode.")
+            textSafeModeWarning.visibility = View.VISIBLE
+            textSafeModeWarning.text = "⚠️ PREVIOUS LAUNCH DIED AT STEP: $crashedStep\nSafe Mode Active: Auto-startup paused so UI stays open. Tap below to resume."
+            btnSafeModeResume.visibility = View.VISIBLE
+            btnSafeModeResume.setOnClickListener {
+                BootDiagnostics.clearPreviousCrash(this)
+                textSafeModeWarning.visibility = View.GONE
+                btnSafeModeResume.visibility = View.GONE
+                isSafeModeActive = false
+                initSubsystemsAsync()
+            }
+            textBootCheckpoint.text = "Status: Safe Mode Active (Halted at $crashedStep)"
+            textBootCheckpoint.setTextColor(ContextCompat.getColor(this, R.color.crimson_drop))
+            // Do NOT auto-execute initSubsystemsAsync()! Keep screen open and responsive!
+            return
+        }
+
+        // 6. Post-Delay Subsystem Startup: Ensure UI is completely drawn and interactive FIRST
         window.decorView.postDelayed({
-            initSubsystemsAsync()
+            if (!isSafeModeActive) {
+                initSubsystemsAsync()
+            }
         }, 500)
     }
 
     private fun initSubsystemsAsync() {
         if (isFinishing || isDestroyed) return
 
-        // 1. Acquire Wi-Fi Multicast Lock safely
-        try {
-            CallShareApp.instance.acquireMulticastLockSafely()
-        } catch (t: Throwable) {
-            Log.w("MainActivity", "Multicast lock deferred: ${t.message}")
-        }
-
-        // 2. Ensure Native Bridge library is loaded
+        // Checkpoint 2: Loading libcallshare_core.so
+        BootDiagnostics.onStepStarting(this, "STEP 2: Loading libcallshare_core.so")
+        textBootCheckpoint.text = "Status: STEP 2: Loading libcallshare_core.so..."
         val nativeLoaded = try {
             NativeBridge.ensureLoaded()
         } catch (t: Throwable) {
             Log.e("MainActivity", "NativeBridge.ensureLoaded() failure: ${t.message}")
             false
         }
+        BootDiagnostics.onStepCompleted(this, "STEP 2: Loading libcallshare_core.so")
 
+        // Checkpoint 3: Calling NativeBridge.initCore()
         if (nativeLoaded) {
+            BootDiagnostics.onStepStarting(this, "STEP 3: Calling NativeBridge.initCore()")
+            textBootCheckpoint.text = "Status: STEP 3: Calling NativeBridge.initCore()..."
             try {
+                CallShareApp.instance.acquireMulticastLockSafely()
                 CallShareApp.instance.initRustNativeCore()
             } catch (t: Throwable) {
                 Log.e("MainActivity", "initRustNativeCore failure: ${t.message}")
                 showStartupErrorDialog("Rust Core", t)
             }
+            BootDiagnostics.onStepCompleted(this, "STEP 3: Calling NativeBridge.initCore()")
         } else {
             val error = NativeBridge.nativeLoadError ?: "Native core not loaded"
             Log.w("MainActivity", "Native library deferred: $error")
         }
 
-        // 3. Register / verify Telecom PhoneAccount defensively
-        guardRegisterTelecomPhoneAccount()
+        // Checkpoint 4: Starting Telemetry / Event Polling Loop
+        BootDiagnostics.onStepStarting(this, "STEP 4: Starting Telemetry / Event Polling Loop")
+        textBootCheckpoint.text = "Status: STEP 4: Starting Telemetry / Event Polling Loop..."
+        try {
+            NativeBridge.startEventPollingLoop()
+        } catch (t: Throwable) {
+            Log.w("MainActivity", "Event polling loop start warning: ${t.message}")
+        }
+        BootDiagnostics.onStepCompleted(this, "STEP 4: Starting Telemetry / Event Polling Loop")
 
-        // 4. Request runtime permissions defensively
+        // Checkpoint 5: Registering Telecom PhoneAccount
+        BootDiagnostics.onStepStarting(this, "STEP 5: Registering Telecom PhoneAccount")
+        textBootCheckpoint.text = "Status: STEP 5: Registering Telecom PhoneAccount..."
+        guardRegisterTelecomPhoneAccount()
+        BootDiagnostics.onStepCompleted(this, "STEP 5: Registering Telecom PhoneAccount")
+
+        // Checkpoint 6: Boot Complete
+        BootDiagnostics.onStepStarting(this, "STEP 6: Boot Complete")
         try {
             requestAppPermissions()
-        } catch (t: Throwable) {
-            Log.e("MainActivity", "Permission request failure: ${t.message}", t)
-            showStartupErrorDialog("Permissions", t)
-        }
-
-        // 5. Refresh Dashboard UI
-        try {
             refreshDashboard()
         } catch (t: Throwable) {
-            Log.e("MainActivity", "Dashboard refresh failure: ${t.message}", t)
+            Log.e("MainActivity", "Permission/Dashboard error: ${t.message}")
         }
+        BootDiagnostics.onBootFinished(this)
+        textBootCheckpoint.text = "● Boot Complete: P2P Mesh Subsystems Active"
+        textBootCheckpoint.setTextColor(ContextCompat.getColor(this, R.color.emerald_active))
     }
 
     private fun showStartupErrorDialog(step: String, t: Throwable) {
@@ -190,9 +286,9 @@ class MainActivity : AppCompatActivity() {
                 android.content.ComponentName(this, CallShareConnectionService::class.java),
                 "CallShareP2P"
             )
+            // Do not call setIcon with large bitmaps/mipmaps to prevent TransactionTooLargeException during Binder IPC
             val phoneAccount = PhoneAccount.builder(accountHandle, "CallShare P2P Relay")
                 .setCapabilities(PhoneAccount.CAPABILITY_CALL_PROVIDER or PhoneAccount.CAPABILITY_CONNECTION_MANAGER)
-                .setIcon(android.graphics.drawable.Icon.createWithResource(this, R.mipmap.ic_launcher))
                 .setHighlightColor(Color.parseColor("#10B981"))
                 .build()
 
@@ -243,6 +339,10 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun bindViews() {
+        textBootCheckpoint = findViewById(R.id.text_boot_checkpoint)
+        textSafeModeWarning = findViewById(R.id.text_safe_mode_warning)
+        btnSafeModeResume = findViewById(R.id.btn_safe_mode_resume)
+
         textLocalInfo = findViewById(R.id.text_local_info)
         textPeersList = findViewById(R.id.text_peers_list)
         btnRefreshPeers = findViewById(R.id.btn_refresh_peers)

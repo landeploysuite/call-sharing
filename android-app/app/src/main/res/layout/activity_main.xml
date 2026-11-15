@@ -48,6 +48,50 @@
             </LinearLayout>
         </LinearLayout>
 
+        <!-- Persistent Boot Diagnostics & Safe Mode Gate -->
+        <LinearLayout
+            android:id="@+id/layout_boot_diagnostics"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:background="@color/dark_card"
+            android:orientation="vertical"
+            android:padding="12dp">
+
+            <TextView
+                android:id="@+id/text_boot_checkpoint"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:fontFamily="monospace"
+                android:text="Boot Diagnostic: Initializing..."
+                android:textColor="@color/cyan_opus_mesh"
+                android:textSize="12sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/text_safe_mode_warning"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:fontFamily="monospace"
+                android:textColor="@color/crimson_drop"
+                android:textSize="12sp"
+                android:textStyle="bold"
+                android:visibility="gone" />
+
+            <Button
+                android:id="@+id/btn_safe_mode_resume"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:backgroundTint="@color/crimson_drop"
+                android:text="Resume Startup (Manual Safe Retry)"
+                android:textColor="@color/white"
+                android:textSize="12sp"
+                android:textStyle="bold"
+                android:visibility="gone" />
+        </LinearLayout>
+
         <TextView
             android:id="@+id/text_local_info"
             android:layout_width="match_parent"

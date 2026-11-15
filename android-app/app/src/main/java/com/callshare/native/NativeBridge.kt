@@ -1,7 +1,10 @@
 package com.callshare.native
 
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import androidx.annotation.Keep
+import org.json.JSONArray
 import java.nio.ByteBuffer
 
 @Keep
@@ -20,6 +23,8 @@ object NativeBridge {
     var nativeLoadError: String? = null
         private set
 
+    @Keep
+    @JvmStatic
     @Synchronized
     fun ensureLoaded(): Boolean {
         if (isNativeLoaded) return true
@@ -48,8 +53,109 @@ object NativeBridge {
 
     private var eventListener: CallEventListener? = null
 
+    @Keep
+    @JvmStatic
     fun setCallEventListener(listener: CallEventListener?) {
         this.eventListener = listener
+    }
+
+    // -------------------------------------------------------------------------
+    // Event Polling Engine (Main Thread Safe - Zero JNI Attach SIGABRT)
+    // -------------------------------------------------------------------------
+    private val mainHandler = Handler(Looper.getMainLooper())
+    private var isPollingRunning = false
+
+    private val eventPollRunnable = object : Runnable {
+        override fun run() {
+            pollAndDispatchEvents()
+            if (isPollingRunning) {
+                mainHandler.postDelayed(this, 100L)
+            }
+        }
+    }
+
+    @Keep
+    @JvmStatic
+    @Synchronized
+    fun startEventPollingLoop() {
+        if (isPollingRunning) return
+        isPollingRunning = true
+        mainHandler.removeCallbacks(eventPollRunnable)
+        mainHandler.post(eventPollRunnable)
+        Log.i(TAG, "Native event polling loop started (100ms interval on MainThread)")
+    }
+
+    @Keep
+    @JvmStatic
+    @Synchronized
+    fun stopEventPollingLoop() {
+        isPollingRunning = false
+        mainHandler.removeCallbacks(eventPollRunnable)
+        Log.i(TAG, "Native event polling loop stopped")
+    }
+
+    @Keep
+    @JvmStatic
+    fun pollAndDispatchEvents() {
+        if (!isNativeLoaded) return
+        try {
+            val jsonStr = safePollNativeEvents()
+            if (jsonStr.isEmpty() || jsonStr == "[]") return
+            val arr = JSONArray(jsonStr)
+            for (i in 0 until arr.length()) {
+                val obj = arr.getJSONObject(i)
+                val type = obj.optString("type")
+                when (type) {
+                    "onNativeRemoteCallRinging", "incoming_call" -> {
+                        val sId = obj.optString("session_id", "")
+                        val cNum = obj.optString("caller_number", "")
+                        val cName = obj.optString("caller_name", "")
+                        val slot = obj.optInt("sim_slot", 0)
+                        onNativeRemoteCallRinging(sId, cNum, cName, slot)
+                    }
+                    "onNativeCallConnected", "call_connected" -> {
+                        val sId = obj.optString("session_id", "")
+                        onNativeCallConnected(sId)
+                    }
+                    "onNativeCallTerminated", "call_terminated" -> {
+                        val sId = obj.optString("session_id", "")
+                        val reason = obj.optString("reason", "unknown")
+                        onNativeCallTerminated(sId, reason)
+                    }
+                    "onNativeCallRevoked", "call_revoked" -> {
+                        val sId = obj.optString("session_id", "")
+                        val reason = obj.optString("reason", "unknown")
+                        onNativeCallRevoked(sId, reason)
+                    }
+                    "onNativePeerDiscovered", "peer_discovered" -> {
+                        eventListener?.onPeersUpdated()
+                    }
+                    "onNativePeerLost", "peer_lost" -> {
+                        eventListener?.onPeersUpdated()
+                    }
+                    "onNativeTelemetryUpdate", "telemetry" -> {
+                        val rtt = obj.optDouble("rtt_ms", 0.0).toFloat()
+                        val loss = obj.optDouble("loss_percent", 0.0).toFloat()
+                        val jitter = obj.optDouble("jitter_ms", 0.0).toFloat()
+                        onNativeTelemetryUpdate(rtt, loss, jitter)
+                    }
+                }
+            }
+        } catch (t: Throwable) {
+            Log.e(TAG, "Exception during native event polling/dispatch: ${t.message}", t)
+        }
+    }
+
+    @Keep
+    @JvmStatic
+    fun safePollNativeEvents(): String {
+        if (!isNativeLoaded) return "[]"
+        return try {
+            pollNativeEvents()
+        } catch (e: Throwable) {
+            Log.e(TAG, "Error in pollNativeEvents: ${e.message}")
+            "[]"
+        }
     }
 
     // -------------------------------------------------------------------------
@@ -150,6 +256,7 @@ object NativeBridge {
     // Defensive Kotlin Wrappers Guarding Native Invocations
     // -------------------------------------------------------------------------
 
+    @Keep @JvmStatic
     fun safeInitNativeCore(
         deviceId: String,
         deviceName: String,
@@ -169,6 +276,7 @@ object NativeBridge {
         }
     }
 
+    @Keep @JvmStatic
     fun safeGetDiscoveredPeersJson(): String {
         if (!isNativeLoaded) return "[]"
         return try {
@@ -179,6 +287,7 @@ object NativeBridge {
         }
     }
 
+    @Keep @JvmStatic
     fun safeStartDiscovery() {
         if (!isNativeLoaded) return
         try {
@@ -188,6 +297,7 @@ object NativeBridge {
         }
     }
 
+    @Keep @JvmStatic
     fun safeStopDiscovery() {
         if (!isNativeLoaded) return
         try {
@@ -197,6 +307,7 @@ object NativeBridge {
         }
     }
 
+    @Keep @JvmStatic
     fun safeConnectToPeer(peerIp: String, signalingPort: Int, mediaPort: Int): Boolean {
         if (!isNativeLoaded) return false
         return try {
@@ -207,6 +318,7 @@ object NativeBridge {
         }
     }
 
+    @Keep @JvmStatic
     fun safeNotifyLocalCallRinging(
         sessionId: String,
         callerNumber: String,
@@ -222,6 +334,7 @@ object NativeBridge {
         }
     }
 
+    @Keep @JvmStatic
     fun safeNotifyCallAnsweredLocally(sessionId: String) {
         if (!isNativeLoaded) return
         try {
@@ -231,6 +344,7 @@ object NativeBridge {
         }
     }
 
+    @Keep @JvmStatic
     fun safeAnswerRelayedCall(sessionId: String) {
         if (!isNativeLoaded) return
         try {
@@ -240,6 +354,7 @@ object NativeBridge {
         }
     }
 
+    @Keep @JvmStatic
     fun safeRejectRelayedCall(sessionId: String, reason: String) {
         if (!isNativeLoaded) return
         try {
@@ -249,6 +364,7 @@ object NativeBridge {
         }
     }
 
+    @Keep @JvmStatic
     fun safeHangupCall(sessionId: String, reason: String) {
         if (!isNativeLoaded) return
         try {
@@ -258,6 +374,7 @@ object NativeBridge {
         }
     }
 
+    @Keep @JvmStatic
     fun safeSetMicMute(muted: Boolean) {
         if (!isNativeLoaded) return
         try {
@@ -267,6 +384,7 @@ object NativeBridge {
         }
     }
 
+    @Keep @JvmStatic
     fun safeOnSensorStateChanged(isNear: Boolean) {
         if (!isNativeLoaded) return
         try {
@@ -276,6 +394,7 @@ object NativeBridge {
         }
     }
 
+    @Keep @JvmStatic
     fun safeSetDeviceOrientation(orientation: Int) {
         if (!isNativeLoaded) return
         try {
@@ -285,6 +404,7 @@ object NativeBridge {
         }
     }
 
+    @Keep @JvmStatic
     fun safeSetAodOrientation(mode: Int) {
         if (!isNativeLoaded) return
         try {
@@ -294,6 +414,7 @@ object NativeBridge {
         }
     }
 
+    @Keep @JvmStatic
     fun safeSetOrbitSpeedMultiplier(multiplier: Float) {
         if (!isNativeLoaded) return
         try {
@@ -303,6 +424,7 @@ object NativeBridge {
         }
     }
 
+    @Keep @JvmStatic
     fun safeGetAodShiftOffset(): IntArray {
         if (!isNativeLoaded) return intArrayOf(0, 0)
         return try {
@@ -313,10 +435,12 @@ object NativeBridge {
         }
     }
 
+    @Keep @JvmStatic
     fun safeGetBurnInOffset(): IntArray {
         return safeGetAodShiftOffset()
     }
 
+    @Keep @JvmStatic
     fun safeIsApIsolated(): Boolean {
         if (!isNativeLoaded) return false
         return try {
@@ -327,6 +451,7 @@ object NativeBridge {
         }
     }
 
+    @Keep @JvmStatic
     fun safePullPlaybackPcmDirect(directBuffer: ByteBuffer, samplesCount: Int): Int {
         if (!isNativeLoaded) return 0
         return try {
@@ -337,6 +462,7 @@ object NativeBridge {
         }
     }
 
+    @Keep @JvmStatic
     fun safeProcessMicCaptureDirect(directBuffer: ByteBuffer, bytesCount: Int) {
         if (!isNativeLoaded) return
         try {
@@ -360,6 +486,7 @@ object NativeBridge {
 
     @Keep @JvmStatic external fun startDiscovery()
     @Keep @JvmStatic external fun stopDiscovery()
+    @Keep @JvmStatic external fun pollNativeEvents(): String
     @Keep @JvmStatic external fun isApIsolated(): Boolean
     @Keep @JvmStatic external fun getDiscoveredPeersJson(): String
     @Keep @JvmStatic external fun connectToPeer(peerIp: String, signalingPort: Int, mediaPort: Int): Boolean
