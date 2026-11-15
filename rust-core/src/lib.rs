@@ -11,7 +11,7 @@ pub mod state;
 use std::net::SocketAddr;
 use std::sync::{Arc, OnceLock};
 use jni::JNIEnv;
-use jni::objects::{JClass, JString, JByteArray, JByteBuffer, JValue};
+use jni::objects::{JByteArray, JByteBuffer, JClass, JObject, JString, JValue};
 use jni::sys::{jboolean, jint, jfloat, jstring, jshortArray, jintArray};
 use parking_lot::Mutex;
 use tokio::runtime::Runtime;
@@ -64,10 +64,14 @@ fn dispatch_java_remote_call_ringing(session_id: &str, caller_number: &str, call
             let Ok(c_num) = env.new_string(caller_number) else { return; };
             let Ok(c_name) = env.new_string(caller_name) else { return; };
 
+            let s_id_obj: JObject = s_id.into();
+            let c_num_obj: JObject = c_num.into();
+            let c_name_obj: JObject = c_name.into();
+
             let args = [
-                JValue::Object(&s_id.into()),
-                JValue::Object(&c_num.into()),
-                JValue::Object(&c_name.into()),
+                JValue::Object(&s_id_obj),
+                JValue::Object(&c_num_obj),
+                JValue::Object(&c_name_obj),
                 JValue::Int(sim_slot),
             ];
 
@@ -92,16 +96,17 @@ fn dispatch_java_call_connected(session_id: &str) {
     };
     if let Ok(mut env) = vm.attach_current_thread() {
         if let Ok(class) = env.find_class("com/callshare/native/NativeBridge") {
-            if let Ok(s_id) = env.new_string(session_id) {
-                let _ = env.call_static_method(
-                    &class,
-                    "onNativeCallConnected",
-                    "(Ljava/lang/String;)V",
-                    &[JValue::Object(&s_id.into())],
-                );
-                if env.exception_check().unwrap_or(false) {
-                    let _ = env.exception_clear();
-                }
+            let Ok(s_id) = env.new_string(session_id) else { return; };
+            let s_id_obj: JObject = s_id.into();
+
+            let _ = env.call_static_method(
+                &class,
+                "onNativeCallConnected",
+                "(Ljava/lang/String;)V",
+                &[JValue::Object(&s_id_obj)],
+            );
+            if env.exception_check().unwrap_or(false) {
+                let _ = env.exception_clear();
             }
         }
     }
@@ -114,16 +119,20 @@ fn dispatch_java_call_terminated(session_id: &str, reason: &str) {
     };
     if let Ok(mut env) = vm.attach_current_thread() {
         if let Ok(class) = env.find_class("com/callshare/native/NativeBridge") {
-            if let (Ok(s_id), Ok(r_str)) = (env.new_string(session_id), env.new_string(reason)) {
-                let _ = env.call_static_method(
-                    &class,
-                    "onNativeCallTerminated",
-                    "(Ljava/lang/String;Ljava/lang/String;)V",
-                    &[JValue::Object(&s_id.into()), JValue::Object(&r_str.into())],
-                );
-                if env.exception_check().unwrap_or(false) {
-                    let _ = env.exception_clear();
-                }
+            let Ok(s_id) = env.new_string(session_id) else { return; };
+            let Ok(r_str) = env.new_string(reason) else { return; };
+
+            let s_id_obj: JObject = s_id.into();
+            let r_str_obj: JObject = r_str.into();
+
+            let _ = env.call_static_method(
+                &class,
+                "onNativeCallTerminated",
+                "(Ljava/lang/String;Ljava/lang/String;)V",
+                &[JValue::Object(&s_id_obj), JValue::Object(&r_str_obj)],
+            );
+            if env.exception_check().unwrap_or(false) {
+                let _ = env.exception_clear();
             }
         }
     }
@@ -136,16 +145,20 @@ fn dispatch_java_call_revoked(session_id: &str, reason: &str) {
     };
     if let Ok(mut env) = vm.attach_current_thread() {
         if let Ok(class) = env.find_class("com/callshare/native/NativeBridge") {
-            if let (Ok(s_id), Ok(r_str)) = (env.new_string(session_id), env.new_string(reason)) {
-                let _ = env.call_static_method(
-                    &class,
-                    "onNativeCallRevoked",
-                    "(Ljava/lang/String;Ljava/lang/String;)V",
-                    &[JValue::Object(&s_id.into()), JValue::Object(&r_str.into())],
-                );
-                if env.exception_check().unwrap_or(false) {
-                    let _ = env.exception_clear();
-                }
+            let Ok(s_id) = env.new_string(session_id) else { return; };
+            let Ok(r_str) = env.new_string(reason) else { return; };
+
+            let s_id_obj: JObject = s_id.into();
+            let r_str_obj: JObject = r_str.into();
+
+            let _ = env.call_static_method(
+                &class,
+                "onNativeCallRevoked",
+                "(Ljava/lang/String;Ljava/lang/String;)V",
+                &[JValue::Object(&s_id_obj), JValue::Object(&r_str_obj)],
+            );
+            if env.exception_check().unwrap_or(false) {
+                let _ = env.exception_clear();
             }
         }
     }
@@ -157,7 +170,7 @@ fn dispatch_java_call_revoked(session_id: &str, reason: &str) {
 
 #[no_mangle]
 pub extern "system" fn Java_com_callshare_native_NativeBridge_initNativeCore(
-    mut env: JNIEnv,
+    env: JNIEnv,
     _class: JClass,
     device_id: JString,
     device_name: JString,
@@ -341,7 +354,7 @@ pub extern "system" fn Java_com_callshare_native_NativeBridge_getDiscoveredPeers
 
 #[no_mangle]
 pub extern "system" fn Java_com_callshare_native_NativeBridge_connectToPeer(
-    mut env: JNIEnv,
+    env: JNIEnv,
     _class: JClass,
     peer_ip: JString,
     signaling_port: jint,
@@ -369,7 +382,7 @@ pub extern "system" fn Java_com_callshare_native_NativeBridge_connectToPeer(
 
 #[no_mangle]
 pub extern "system" fn Java_com_callshare_native_NativeBridge_notifyLocalCallRinging(
-    mut env: JNIEnv,
+    env: JNIEnv,
     _class: JClass,
     session_id: JString,
     caller_number: JString,
@@ -408,7 +421,7 @@ pub extern "system" fn Java_com_callshare_native_NativeBridge_notifyLocalCallRin
 /// Bug 2.1: Host phone answered locally via Bluetooth; revoke remote relay
 #[no_mangle]
 pub extern "system" fn Java_com_callshare_native_NativeBridge_notifyCallAnsweredLocally(
-    mut env: JNIEnv,
+    env: JNIEnv,
     _class: JClass,
     session_id: JString,
 ) {
@@ -426,7 +439,7 @@ pub extern "system" fn Java_com_callshare_native_NativeBridge_notifyCallAnswered
 
 #[no_mangle]
 pub extern "system" fn Java_com_callshare_native_NativeBridge_answerRelayedCall(
-    mut env: JNIEnv,
+    env: JNIEnv,
     _class: JClass,
     session_id: JString,
 ) {
@@ -444,7 +457,7 @@ pub extern "system" fn Java_com_callshare_native_NativeBridge_answerRelayedCall(
 
 #[no_mangle]
 pub extern "system" fn Java_com_callshare_native_NativeBridge_rejectRelayedCall(
-    mut env: JNIEnv,
+    env: JNIEnv,
     _class: JClass,
     session_id: JString,
     reason: JString,
@@ -464,7 +477,7 @@ pub extern "system" fn Java_com_callshare_native_NativeBridge_rejectRelayedCall(
 
 #[no_mangle]
 pub extern "system" fn Java_com_callshare_native_NativeBridge_hangupCall(
-    mut env: JNIEnv,
+    env: JNIEnv,
     _class: JClass,
     session_id: JString,
     reason: JString,
@@ -577,7 +590,7 @@ pub extern "system" fn Java_com_callshare_native_NativeBridge_getAodShiftOffset(
 /// Bug 2.2: Zero-allocation direct ByteBuffer audio extraction preventing ART reference overflow
 #[no_mangle]
 pub extern "system" fn Java_com_callshare_native_NativeBridge_pullPlaybackPcmDirect(
-    mut env: JNIEnv,
+    env: JNIEnv,
     _class: JClass,
     direct_buffer: JByteBuffer,
     samples_count: jint,
@@ -608,7 +621,7 @@ pub extern "system" fn Java_com_callshare_native_NativeBridge_pullPlaybackPcmDir
 /// Bug 2.2: Zero-allocation direct ByteBuffer mic ingest
 #[no_mangle]
 pub extern "system" fn Java_com_callshare_native_NativeBridge_processMicCaptureDirect(
-    mut env: JNIEnv,
+    env: JNIEnv,
     _class: JClass,
     direct_buffer: JByteBuffer,
     bytes_count: jint,
