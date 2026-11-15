@@ -34,6 +34,7 @@ class AodActivity : AppCompatActivity(), SensorEventListener {
     private var proximitySensor: Sensor? = null
 
     private lateinit var aodContainer: View
+    private lateinit var draggableCanvas: DraggableAodCanvasView
     private lateinit var textClock: TextView
     private lateinit var textDate: TextView
     private lateinit var textBattery: TextView
@@ -117,9 +118,21 @@ class AodActivity : AppCompatActivity(), SensorEventListener {
         val callerName = intent.getStringExtra("EXTRA_CALLER_NAME") ?: callerNumber
         isCallRinging = intent.getBooleanExtra("EXTRA_IS_RINGING", false)
 
+        val isEditMode = intent.getBooleanExtra("EXTRA_START_EDIT_MODE", false)
+        val newStickerPath = intent.getStringExtra("EXTRA_NEW_STICKER_PATH")
+
+        if (isEditMode || newStickerPath != null) {
+            aodContainer.visibility = View.GONE
+            draggableCanvas.visibility = View.VISIBLE
+            draggableCanvas.isEditMode = isEditMode
+            if (newStickerPath != null) {
+                draggableCanvas.addStickerWidget(newStickerPath)
+            }
+        }
+
         if (isCallRinging && !callerNumber.isNullOrBlank()) {
             showIncomingCallAlert(callerName ?: "Unknown", callerNumber)
-        } else {
+        } else if (!isEditMode && newStickerPath == null) {
             hideIncomingCallAlert()
         }
     }
@@ -151,6 +164,7 @@ class AodActivity : AppCompatActivity(), SensorEventListener {
 
     private fun bindViews() {
         aodContainer = findViewById(R.id.aod_content_container)
+        draggableCanvas = findViewById(R.id.draggable_aod_canvas)
         textClock = findViewById(R.id.text_aod_clock)
         textDate = findViewById(R.id.text_aod_date)
         textBattery = findViewById(R.id.text_aod_battery)

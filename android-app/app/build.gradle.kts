@@ -52,6 +52,13 @@ android {
             jniLibs.srcDirs("src/main/jniLibs")
         }
     }
+
+    packaging {
+        jniLibs {
+            useLegacyPackaging = true
+            keepDebugSymbols.add("**/libcallshare_core.so")
+        }
+    }
 }
 
 dependencies {

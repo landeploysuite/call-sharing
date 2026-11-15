@@ -144,4 +144,12 @@
         </LinearLayout>
 
     </LinearLayout>
+
+    <!-- Freeform Drag-and-Drop Canvas View (when editing or custom canvas is active) -->
+    <com.callshare.ui.DraggableAodCanvasView
+        android:id="@+id/draggable_aod_canvas"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:visibility="gone" />
+
 </FrameLayout>
